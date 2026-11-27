@@ -136,9 +136,10 @@ unicamente resultados ya extraidos y validados.
 [Otros usuarios autorizados consultan y comparten los resultados]
 ```
 
-> **El PDF nunca sale del equipo del usuario.** No se sube a la API en el camino principal.
-> El servidor almacena metadatos del documento y los resultados extraidos, nunca el
-> archivo ni su texto.
+> **El PDF nunca pasa por la API.** No se sube al servidor en el camino principal: sube
+> directo del navegador al almacenamiento privado, y el servidor guarda metadatos del
+> documento y los resultados extraidos, nunca el archivo ni su texto. El unico lugar donde
+> el archivo esta es el almacenamiento privado del proyecto (ADR-20).
 
 ### 4.1 Mapa-Reduce sobre bloques
 

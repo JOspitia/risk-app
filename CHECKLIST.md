@@ -244,7 +244,9 @@
 
 ## Gate 10 — Privacidad
 
-- [ ] El PDF original **no sale del equipo del usuario** en el camino principal
+- [ ] El analisis ocurre en el equipo del usuario; el archivo original **se archiva en
+      almacenamiento privado** del proyecto y **solo se elimina al borrar el documento**
+      (ADR-20)
 - [ ] Ningun texto extraido aparece en logs, traces ni metricas
 - [ ] Ningun texto extraido se persiste fuera de `datos_estructurados` y `resumen`, que son
       los resultados que el usuario pidio

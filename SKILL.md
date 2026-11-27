@@ -272,21 +272,39 @@ class DocumentoRepository(Protocol):
 ```
 
 ```python
-# adapters/db/documentos.py
-from sqlalchemy import select
+# adapters/supabase/documentos.py
+from supabase import AsyncClient
 
-class DocumentoRepositoryPostgres:
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+class DocumentoRepositorySupabase:
+    """Implementa el puerto con el cliente HTTP de Supabase (PostgREST).
+
+    La peticion lleva el JWT del usuario: PostgREST lo usa para evaluar las politicas
+    RLS. Por eso el repositorio no decide la visibilidad.
+    """
+
+    def __init__(self, cliente: AsyncClient) -> None:
+        self._cliente = cliente
 
     async def obtener_por_id(self, documento_id: UUID) -> Documento | None:
-        stmt = select(ModelDocumento).where(
-            ModelDocumento.id == documento_id,
-            ModelDocumento.eliminado_en.is_(None),   # soft delete: excluido de lectura
-        )
-        fila = (await self._session.execute(stmt)).scalar_one_or_none()
-        return mapear_a_entidad(fila) if fila else None
+        respuesta = await self._cliente.table("documentos").select(
+            "*",
+        ).eq("id", str(documento_id)).is_("eliminado_en", "null").limit(1).execute()
+        filas = respuesta.data
+        return mapear_a_entidad(filas[0]) if filas else None
 ```
+
+> **Este adaptador no usa SQLAlchemy ni `asyncpg`.** El acceso a datos es por HTTP
+> (ADR-04): el backend no abre una conexion TCP a Postgres en el camino de ejecucion. Asi
+> el servicio es stateless y portable a runtimes sin conexiones persistentes.
+>
+> **Lo que si necesita SQL es la atomicidad**, y por eso existe el puerto de RPC: hay
+> operaciones que deben ser una transaccion (registrar un analisis completo, mover un
+> analisis al historial). Esas se resuelven con funciones de Postgres (`security definer`,
+> con `set search_path = public` y sus propias comprobaciones de permiso), llamadas por
+> RPC. La transaccion vive dentro de la base, donde pertenece. Ver seccion 6.1.
+>
+> **El repositorio mapea filas, no politicas.** Que un documento sea visible lo decide
+> RLS y el permiso; el repositorio solo traduce.
 
 ### 1.7 Model / Entidad de dominio
 
@@ -849,7 +867,9 @@ encuentra, para que ambos caminos cuesten lo mismo.
 
 ### 5.6 Carga de archivos
 
-- Validar el **tipo real** del archivo (magic bytes), no solo la extension.
+- Validar el **tipo real** del archivo (magic bytes), no solo la extension. **En el
+  navegador**: el backend nunca ve el archivo, asi que no puede inspeccionar sus magic
+  bytes. La validacion ocurre antes de subir, y el bucket restringe los MIME permitidos.
 - Limitar el tamano **antes** de leer el archivo en memoria.
 - Sanear el nombre: no se usa el nombre del cliente como nombre en disco.
 - **El archivo se archiva** en almacenamiento privado (ADR-20), y se borra cuando se borra
@@ -858,17 +878,23 @@ encuentra, para que ambos caminos cuesten lo mismo.
   funcion: su cuerpo esta limitado a 4.5 MB y un PDF de 100 paginas pesa mucho mas.
 - El analisis ocurre en el navegador, sobre el archivo local. Que el archivo se archive no
   significa que el servidor lo procese.
+- Cuando el backend confirma la subida (`POST /documentos/{id}/archivo`), **consulta los
+  metadatos del objeto** en Storage: existencia, tamano real y MIME guardado. Si no
+  coinciden con lo que declaro el cliente, no confirma la ruta.
 
 ---
 
 ## 6. Transacciones
 
 En una arquitectura hexagonal, la transaccion es un **puerto** (`UnitOfWork`) que el caso de
-uso usa. La implementacion real depende del motor de persistencia.
+uso usa. Lo que cambia con el acceso por HTTP es **como se implementa**: no hay una sesion
+de SQL que abrir y cerrar, hay una operacion atomica que se pide a la base.
 
 ```python
 # application/unit_of_work.py
 class UnitOfWork(Protocol):
+    """Una transaccion. Un caso de uso, un commit."""
+
     documentos: DocumentoRepository
     bloques: BloqueRepository
     analisis: AnalisisRepository
@@ -884,7 +910,7 @@ La forma del caso de uso:
 ```python
 async with self.uow as u:
     try:
-        documento_id = await u.documentos.crear(documento)
+        documento_id = await u.analisis.registrar(documento, bloques, analisis)
         await u.commit()
     except Exception:
         await u.rollback()
@@ -892,18 +918,34 @@ async with self.uow as u:
 ```
 
 **Regla:** nunca mezcles una escritura auto-commit dentro de un bloque transaccional. Una
-conexion, una transaccion, un commit.
+operacion, una transaccion, un commit.
 
-Las variantes de cada metodo de escritura reciben la sesion abierta, de modo que el
-repositorio participa de la transaccion del caso de uso en vez de abrir una competencia.
+**Como se implementa sin conexion TCP.** La operacion atomica se pide a Postgres por RPC
+(seccion 6.1): una funcion que inserta el documento, sus bloques y su analisis, o nada.
+La atomicidad la garantiza la base de datos, no el backend. Por eso el puerto de
+persistencia declara **una sola operacion**, no varias.
+
+Lo que **no** se hace: abrir una conexion TCP, empezar una transaccion en Python, y
+mandar sentencias una a una. Eso contradice ADR-04 y hace que el servicio dependa de un
+pool de conexiones que las funciones de Vercel no mantienen.
 
 ```python
-# El repositorio recibe la sesion; no abre otra.
-async def crear(self, documento: Documento) -> UUID:
-    fila = ModelDocumento(...)
-    self._session.add(fila)
-    await self._session.flush()
-    return fila.id
+# El repositorio pide la operacion atomica. No compone varias escrituras.
+async def registrar(self, documento: Documento, bloques: list[Bloque], analisis: Analisis) -> UUID:
+    respuesta = await self._cliente.rpc(
+        "registrar_analisis",
+        {
+            "p_documento_id": str(documento.id),
+            "p_bloques": [b.to_dict() for b in bloques],
+            "p_resumen_ejecutivo": analisis.resumen_ejecutivo,
+            "p_riesgos": analisis.riesgos,
+            "p_plantilla_id": str(analisis.plantilla_id),
+            "p_plantilla_version": analisis.plantilla_version,
+            "p_modelo": analisis.modelo,
+            "p_total_bloques": len(bloques),
+        },
+    ).execute()
+    return UUID(respuesta.data)
 ```
 
 ### 6.1 Transacciones sin conexion TCP (PostgREST)
@@ -912,44 +954,60 @@ async def crear(self, documento: Documento) -> UUID:
 Eso lo deja stateless y portable entre plataformas de funciones. Ver ADR-04.
 
 El precio es que **PostgREST no tiene transacciones de varias sentencias**. La operacion
-atomica "crear documento + N bloques + analisis" se resuelve con una **funcion de Postgres**
+atomica "guardar documento + N bloques + analisis" se resuelve con una **funcion de Postgres**
 llamada por RPC:
 
 ```sql
--- migrations/xxxx_registrar_analisis.sql
+-- supabase/migrations/005_funciones_rpc.sql
 create or replace function public.registrar_analisis(
-  p_nombre_archivo   text,
-  p_hash_sha256      text,
-  p_total_paginas    int,
-  p_modo             text,
-  p_bloques          jsonb,
-  p_resumen_ejecutivo text,
-  p_riesgos          jsonb
+  p_documento_id       uuid,
+  p_bloques            jsonb,
+  p_resumen_ejecutivo  text,
+  p_riesgos            jsonb,
+  p_plantilla_id       uuid,
+  p_plantilla_version  int,
+  p_modelo             text,
+  p_total_bloques      int
 ) returns uuid
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  v_documento_id uuid;
   v_bloque jsonb;
   v_indice int := 0;
+  v_documento uuid;
+  v_analisis_id uuid;
+  v_plantilla_anterior uuid;
+  v_version_anterior int;
+  v_modelo_anterior text;
+  v_resumen_anterior text;
+  v_riesgos_anterior jsonb;
+  v_resumenes_anterior jsonb;
+  v_hay_anterior boolean := false;
 begin
-  -- El aislamiento NO setrust: se comprueba aqui, dentro de la transaccion.
-  if not public.usuario_tiene_acceso_al_documento(auth.uid()) then
-    raise exception 'forbidden' using errcode = '42501';
+  -- 1. El aislamiento NO se setrust: se comprueba aqui, dentro de la transaccion.
+  select d.id into v_documento
+  from public.documentos d
+  where d.id = p_documento_id
+    and d.usuario_id = auth.uid()
+    and d.eliminado_en is null;
+
+  if v_documento is null then
+    raise exception 'not_found' using errcode = 'P0002';
   end if;
 
-  insert into public.documentos (
-    usuario_id, organizacion_id, nombre_archivo, hash_sha256,
-    total_paginas, modo_procesamiento, estado
-  )
-  values (
-    auth.uid(),
-    public.organizacion_del_usuario(auth.uid()),
-    p_nombre_archivo, p_hash_sha256, p_total_paginas, p_modo, 'completado'
-  )
-  returning id into v_documento_id;
+  -- 2. Se captura el analisis vigente ANTES de sobrescribirlo: despues ya no existira.
+  select a.id, a.plantilla_id, a.plantilla_version, a.modelo,
+         a.resumen_ejecutivo, a.riesgos, a.resumenes
+  into v_analisis_id, v_plantilla_anterior, v_version_anterior, v_modelo_anterior,
+       v_resumen_anterior, v_riesgos_anterior, v_resumenes_anterior
+  from public.analisis_documentos a
+  where a.documento_id = v_documento;
+
+  v_hay_anterior := v_analisis_id is not null;
+
+  delete from public.bloques where documento_id = v_documento;
 
   for v_bloque in select * from jsonb_array_elements(p_bloques) loop
     insert into public.bloques (
@@ -957,22 +1015,70 @@ begin
       resumen, datos_estructurados
     )
     values (
-      v_documento_id, auth.uid(), v_indice,
+      v_documento, auth.uid(), v_indice,
       (v_bloque->>'pagina_inicio')::int, (v_bloque->>'pagina_fin')::int,
       v_bloque->>'resumen', v_bloque->'datos_estructurados'
     );
     v_indice := v_indice + 1;
   end loop;
 
+  -- 3. El analisis vigente. Uno por documento.
   insert into public.analisis_documentos (
-    documento_id, usuario_id, resumen_ejecutivo, riesgos
+    documento_id, usuario_id, plantilla_id, plantilla_version, modelo,
+    total_bloques, resumen_ejecutivo, riesgos, resumenes
   )
-  values (v_documento_id, auth.uid(), p_resumen_ejecutivo, p_riesgos);
+  values (
+    v_documento, auth.uid(), p_plantilla_id, p_plantilla_version, p_modelo,
+    p_total_bloques, p_resumen_ejecutivo, p_riesgos,
+    (select coalesce(jsonb_agg(jsonb_build_object(
+        'indice', b.indice,
+        'paginas', b.pagina_inicio || '-' || b.pagina_fin,
+        'resumen', b.resumen
+     ) order by b.indice), '[]'::jsonb)
+     from public.bloques b where b.documento_id = v_documento)
+  )
+  on conflict (documento_id) do update set
+    plantilla_id = excluded.plantilla_id,
+    plantilla_version = excluded.plantilla_version,
+    modelo = excluded.modelo,
+    total_bloques = excluded.total_bloques,
+    resumen_ejecutivo = excluded.resumen_ejecutivo,
+    riesgos = excluded.riesgos,
+    resumenes = excluded.resumenes
+  returning id into v_analisis_id;
 
-  return v_documento_id;
+  -- 4. El analisis anterior pasa al historial (ADR-25).
+  if v_hay_anterior then
+    insert into public.analisis_historial (
+      documento_id, usuario_id, plantilla_id, plantilla_version, modelo,
+      resumen_ejecutivo, riesgos, resumenes, reemplazado_por, creado_en
+    )
+    values (
+      v_documento, auth.uid(), v_plantilla_anterior, v_version_anterior,
+      v_modelo_anterior, v_resumen_anterior, v_riesgos_anterior,
+      v_resumenes_anterior, v_analisis_id, now()
+    );
+  end if;
+
+  -- 5. El documento y el trabajo quedan cerrados en la MISMA transaccion.
+  update public.documentos
+  set estado = 'completado', error_mensaje = null, actualizado_en = now()
+  where id = v_documento;
+
+  update public.trabajos
+  set estado = 'completado', finalizado_en = now(),
+      duracion_ms = extract(epoch from (now() - iniciado_en)) * 1000
+  where documento_id = v_documento and estado in ('en_cola', 'en_proceso');
+
+  return v_documento;
 end;
 $$;
 ```
+
+> **`resumenes` se construye dentro de la base.** El cliente envia los bloques, no el
+> arreglo de resumenes duplicado. Si el payload trajera los dos, un documento de 250
+> paginas (125 bloques) mandaria el doble de lo necesario y se acercaria al limite de
+> 4.5 MB de Vercel Functions. Ver I-10 del informe de validacion.
 
 Reglas para las funciones de Postgres:
 
@@ -989,6 +1095,11 @@ Reglas para las funciones de Postgres:
 **Consecuencia para los puertos:** el puerto de persistencia declara la operacion de
 persistencia atomica como **una sola llamada** (`registrar_analisis`), no tres llamadas
 separadas. El caso de uso no necesita saber que por debajo hay una funcion de Postgres.
+
+**`registrar_analisis` cubre tambien el reanálisis.** La funcion es la misma para el
+analisis inicial y para el reanálisis (HU-10): si ya habia un analisis vigente, este pasa
+al historial y el nuevo lo sustituye. Todo en la misma transaccion: o quedan los dos, o
+no queda ninguno.
 
 ---
 
@@ -1346,7 +1457,63 @@ def dividir_en_bloques(
     return bloques
 ```
 
-#### 10.2.1 El tamano de bloque se deriva de la ventana de contexto
+**El numero de bloques sale del solapamiento, no del tamano.** Con `tamano_paginas = 3` y
+`overlap_paginas = 1`, el paso es 2, y un documento de 100 paginas produce
+`ceil((100 - 1) / 2) = 50` bloques. No 34: ese numero sale de dividir 100 entre 3 e
+ignorar que las ventanas se solapan.
+
+```python
+def contar_bloques(total_paginas: int, tamano_paginas: int, overlap_paginas: int) -> int:
+    paso = tamano_paginas - overlap_paginas
+    return max(1, ceil((total_paginas - overlap_paginas) / paso))
+```
+
+**El solapamiento no es gratis.** Con 50 bloques, el texto se procesa
+`50 * 3 = 150` paginas por 100 del documento: un 50% mas de trabajo. Es el precio de que
+un dato que cae en la frontera entre dos bloques no se pierda. El valor por defecto es 1
+pagina, que es el minimo que todavía sirve para eso.
+
+#### 10.2.2 Un tope por tokens, no solo por paginas
+
+`[DECIDIDO]` **El numero de paginas es una estimacion; el limite real es de tokens.**
+
+Contar paginas falla con documentos reales: una pagina con una tabla densa o un anexo
+financiero puede tener 2.000 a 3.000 tokens, mientras que una pagina de texto corrido
+tiene 400. Con `tokens_por_pagina = 700` y 3 paginas por bloque, un bloque puede llevar
+9.000 tokens en una ventana de 4.096. El sintoma no es "el bloque es grande": es que el
+modelo **devuelve basura** o se corta en silencio.
+
+Por eso, despues de trocear por paginas, **cada bloque se subdivide por longitud**:
+
+```python
+# domain/services/chunking.py
+CARACTERES_POR_TOKEN = 3.5   # español: ~3.5 caracteres por token
+
+def tokens_estimados(texto: str) -> int:
+    return int(len(texto) / CARACTERES_POR_TOKEN)
+
+def subdividir_por_tokens(
+    bloque: Bloque,
+    maximo_tokens: int,
+) -> list[Bloque]:
+    """Parte un bloque que excede el maximo, sin partir una pagina a la mitad."""
+    if tokens_estimados(bloque.texto) <= maximo_tokens:
+        return [bloque]
+    partes: list[Bloque] = []
+    for pagina in bloque.paginas:          # el bloque guarda sus paginas sueltas
+        partes.append(Bloque(indice=0, pagina_inicio=..., pagina_fin=..., texto=pagina))
+    return partes
+```
+
+La subdivision **nunca parte una pagina por la mitad**: una tabla partida es ilegible.
+Si una sola pagina excede el maximo, se procesa sola y el caso queda marcado para
+revision: es un documento con una pagina imposible, no un error del troceador.
+
+El `tokens_por_pagina` que se guarda en la configuracion es **una estimacion para el
+troceado inicial**, no una garantia. El limite que manda es `ventana_contexto -
+tokens_reservados`, y se comprueba bloque a bloque.
+
+#### 10.2.3 El tamano de bloque se deriva de la ventana de contexto
 
 `[DECIDIDO]` No se fija a mano. Los modelos precompilados de WebLLM vienen con **4096
 tokens** de contexto por defecto, y 10 paginas de texto denso rondan las 4.000 a 6.000
@@ -1363,6 +1530,10 @@ def calcular_paginas_por_bloque(
     """Deriva el tamano de bloque a partir de la ventana del modelo.
 
     Con 4096 de ventana, 1200 reservados y 700 tokens por pagina: 4 paginas.
+    Con 900 tokens por pagina: 3 paginas.
+
+    El resultado es una estimacion de partida. El limite real se comprueba por bloque
+    con tokens estimados (seccion 10.2.2).
     """
     utiles = ventana_contexto - tokens_reservados
     if utiles <= 0:
@@ -1459,7 +1630,11 @@ export async function analizarBloque(
       temperature: temperatura,
       // Generacion restringida por gramatica: reduce mucho los JSON invalidos,
       // pero NO sustituye la validacion del backend.
-      response_format: { type: 'json_object', schema: esquema },
+      // OJO: `schema` es un STRING JSON, no un objeto. WebLLM lo serializa.
+      response_format: {
+        type: 'json_object',
+        schema: JSON.stringify(esquema),
+      },
     })
 
     try {
@@ -1477,6 +1652,26 @@ export async function analizarBloque(
 
 La validacion definitiva ocurre en el backend, contra el esquema de la plantilla. El
 cliente **no es una frontera de confianza**.
+
+**Que construcciones de JSON Schema admite el motor.** La generacion restringida usa
+XGrammar, que soporta un **subconjunto acotado** de JSON Schema. La plantilla de
+extraccion tiene que declarar solo lo que el motor entiende:
+
+| Se admite | Se evita |
+|---|---|
+| `type`, `properties`, `required`, `items`, `enum` | `oneOf`, `anyOf`, `allOf`, `not` |
+| `additionalProperties: false` | `patternProperties`, `dependentSchemas` |
+| `type: ["string", "null"]` para opcionales | `if` / `then` / `else` |
+
+La plantilla **valida en el servidor** que su esquema cae dentro del subconjunto antes de
+aceptarla. Una plantilla con `oneOf` no es un error de ejecucion: es una plantilla que no
+se puede usar con generacion restringida, y el backend lo dice al guardarla, no cuando el
+modelo ya fallo.
+
+**El `schema` se serializa, no se pasa como objeto.** WebLLM espera `schema` como un
+**string** JSON (`JSON.stringify(esquema)`). Pasarlo como objeto no falla con un error
+claro: produce una generacion sin restringir, y el sintoma es un JSON invalido en la
+salida, muy lejos de la causa.
 
 #### Adaptador de servidor (v2)
 
@@ -2088,7 +2283,8 @@ La version completa, con los gates de privacidad y de entrega, esta en
 - [ ] La suite se reejecuto desde limpio y se reconstruyo de verdad
 
 **Privacidad**
-- [ ] El PDF se borra al terminar el pipeline
+- [ ] El PDF se archiva en almacenamiento privado y **solo** se elimina al borrar el
+      documento. No se borra al terminar el pipeline (ADR-20)
 - [ ] Ningun texto extraido aparece en logs, trazas ni metricas
 
 ---
