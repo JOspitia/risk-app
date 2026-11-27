@@ -365,6 +365,23 @@ create table analisis_documentos (
   created_at        timestamptz not null default now()
 );
 
+-- Historial de analisis: cuando un documento se reanaliza con otra plantilla, el
+-- analisis anterior se mueve aqui en vez de sobrescribirse (ADR-25).
+create table analisis_historial (
+  id                uuid primary key default gen_random_uuid(),
+  documento_id      uuid not null references documentos(id) on delete cascade,
+  usuario_id        uuid not null references auth.users(id) on delete cascade,
+  plantilla_id      uuid references plantillas_extraccion(id),
+  plantilla_version int,
+  modelo            text,          -- modelo usado en ese analisis
+  resumen_ejecutivo text,
+  riesgos           jsonb,
+  resumenes         jsonb,
+  -- Id del analisis vigente que sustituyo a este.
+  reemplazado_por   uuid references analisis_documentos(id),
+  created_at        timestamptz not null default now()
+);
+
 -- Roles y permisos granulares. La matriz vive en datos, no en codigo: agregar un permiso
 -- no requiere desplegar.
 create table roles (
@@ -400,7 +417,7 @@ create table trabajos (
   usuario_id      uuid not null references auth.users(id) on delete cascade,
   tipo            text not null default 'analisis',  -- analisis | reanalisis
   estado          text not null default 'en_cola',
-                  -- en_cola | en_proceso | completado | error | cancelado
+                  -- en_cola | en_proceso | completado | error | cancelado | interrumpido
   progreso        int  not null default 0 check (progreso between 0 and 100),
   paso_actual     text,      -- 'extrayendo' | 'analizando bloque 7 de 34' | 'reduciendo'
   modo            text not null,  -- navegador_local | servidor_python
@@ -463,6 +480,7 @@ create index documentos_estado_idx      on documentos (estado) where estado = 'e
 create index bloques_documento_idx     on bloques (documento_id, indice);
 create index bloques_riesgos_gin        on bloques using gin (datos_estructurados);
 create index analisis_documento_idx     on analisis_documentos (documento_id);
+create index historial_documento_idx   on analisis_historial (documento_id, created_at desc);
 create index plantillas_org_idx         on plantillas_extraccion (organizacion_id, activa);
 create index miembros_usuario_idx       on organizaciones_miembros (usuario_id);
 create index trabajos_usuario_idx       on trabajos (usuario_id, created_at desc);
@@ -897,7 +915,7 @@ cambia.
 | Empieza a procesar | API o navegador | `estado = en_proceso`, `iniciado_en`, `paso_actual` |
 | Avanza | API o navegador | `progreso` y `paso_actual` (monotono) |
 | Cada paso | API o navegador | fila en `trabajo_actividades` |
-| Termina | API | `estado = completado | error`, `finalizado_en`, `duracion_ms` |
+| Termina | API | `estado = completado \| error`, `finalizado_en`, `duracion_ms` |
 
 **Reglas:**
 
@@ -1065,6 +1083,7 @@ cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la 
 | GET | `/api/v1/documentos/{id}/analisis` | Analisis completo (DTO de salida) | Si |
 | POST | `/api/v1/documentos/{id}/archivo` | Confirma la subida y guarda la ruta | Si, dueno |
 | GET | `/api/v1/documentos/{id}/descarga` | URL firmada de descarga (1 h) | Si, `documentos.ver` |
+| POST | `/api/v1/documentos/{id}/reanalisis` | Reanaliza un documento archivado con la plantilla vigente | Si, `documentos.analizar` |
 | GET | `/api/v1/trabajos/{id}` | Progreso, paso actual, duracion y actividades | Si |
 | POST | `/api/v1/trabajos` | Abre un trabajo para un documento (el cliente lo reporta) | Si |
 | POST | `/api/v1/trabajos/{id}/progreso` | El cliente reporta progreso y actividades | Si (dueno) |
@@ -1305,6 +1324,9 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-21 | El primer despliegue usa planes gratuitos (Vercel Hobby + Supabase Free) | 2026-11-27 | Aceptada | Permite mostrar el producto sin gasto. Se documentan las tres limitaciones del plan gratuito (pausa por inactividad, SMTP de 2 correos/hora, uso no comercial en Hobby) para que se anticipen y no se descubran en vivo |
 | ADR-22 | Retencion por defecto: los documentos se conservan hasta que el dueno o un admin los borra, sin expiracion automatica | 2026-11-27 | Aceptada | Es el supuesto que menos impone para la demo. Se cambia por decision del cliente cuando se conozca su politica y su base legal. **No es una politica de retencion final** |
 | ADR-23 | El motor LLM, el almacenamiento y el despliegue son intercambiables por diseño; un proveedor de modelos hospedado exige un ADR propio | 2026-11-27 | Aceptada | El cliente puede tener un contrato con un proveedor de modelos, o su propio S3 o SFTP. Los puertos lo permiten; lo que cambia es el adaptador. Un motor hospedado cambia la postura de privacidad, asi que no es un default: se activa explicitamente y queda registrado |
+| ADR-24 | El trabajo abandonado se marca `interrumpido` por una tarea de mantenimiento que detecta la falta de latido | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Cierra HU-08 |
+| ADR-25 | El reanálisis conserva el análisis anterior en una tabla de historial y actualiza el vigente | 2026-11-27 | Aceptada | "No sobrescribir" es una promesa vacia si no hay donde conservar lo anterior. La tabla aparte evita relajar el `unique` de `analisis_documentos` y deja el historial con su propia forma. Cierra HU-10 y la parte de DP-13 que faltaba |
+| ADR-26 | El reanálisis se pide por un endpoint propio y el archivo viaja del bucket privado al navegador, nunca por el backend | 2026-11-27 | Aceptada | Reutilizar `POST /documentos` para el reanálisis mezclaría dos operaciones con permisos y precondiciones distintas. Y el PDF no puede pasar por la funcion: el cuerpo de peticion llega a 4.5 MB. Cierra HU-10 |
 
 ### 10.1 Como se registra una decision nueva
 

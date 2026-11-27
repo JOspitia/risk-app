@@ -50,15 +50,15 @@ ejecuta en el navegador del usuario.
 | Area | Estado |
 |---|---|
 | Especificacion funcional | Completa. 25 RF + 9 RNF |
-| Decisiones de arquitectura | Completas. 23 ADR |
+| Decisiones de arquitectura | Completas. 26 ADR |
 | Decisiones de producto | Completas. 15 de 15 cerradas |
-| Historias de usuario | **2 de 10** escritas (HU-01, HU-02) |
+| Historias de usuario | **10 de 10** escritas |
 | Metodo y contratos de codigo | Completo. `SKILL.md` |
 | Gates de verificacion | Completos. 17 gates en `CHECKLIST.md` |
 | **Codigo de aplicacion** | **No existe todavia** |
-| Pendientes documentados | 8 (PP-01 a PP-08) |
+| Pendientes documentados | 13 (PP-01 a PP-13) |
 
-**La siguiente fase** es escribir HU-03 a HU-10 y despues el esqueleto del backend.
+**La siguiente fase** es el esqueleto del backend y la primera migracion.
 
 ---
 
@@ -206,8 +206,8 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `README.md` | Este brief | Primero, siempre |
 | `AGENTS.md` | Reglas del repositorio y orden de lectura | Antes de tocar nada |
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones | Para entender el **que** |
-| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **23 ADR** | Para entender el **como** |
-| `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-08** | Para saber que esta abierto |
+| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **26 ADR** | Para entender el **como** |
+| `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-13** | Para saber que esta abierto |
 | `docs/HU/INDICE.md` | Indice de historias de usuario y grafo de dependencias | Para planificar trabajo |
 | `docs/HU/HU-0*.md` | Historias de usuario completas | Antes de implementar una funcionalidad |
 | `SKILL.md` | Los **9 contratos de codigo**, el baseline de seguridad, las transacciones, las pruebas | Al escribir codigo. Es normativa |
@@ -315,14 +315,11 @@ Y el criterio de severidad que conviene darle:
 
 ## 10. Lo que viene ahora
 
-1. **HU-03 a HU-10**: administracion de usuarios, configuracion del motor, compatibilidad
-   y descarga del modelo, carga y archivo, analisis ETL + Map-Reduce, seguimiento del
-   trabajo, consulta de resultados, reanálisis.
-2. **El esqueleto**: `pyproject.toml`, estructura de carpetas, configuracion por entorno.
-3. **La migracion**: esquema con RLS, matriz de permisos y bucket privado, aplicada contra
+1. **El esqueleto**: `pyproject.toml`, estructura de carpetas, configuracion por entorno.
+2. **La migracion**: esquema con RLS, matriz de permisos y bucket privado, aplicada contra
    una base **vacia** (no se acepta una migracion que nunca se ejecuto).
-4. **Los contratos**: entidades, puertos, casos de uso, envelope, errores.
-5. **Las pruebas**: translatedas de los criterios de aceptacion de cada HU.
+3. **Los contratos**: entidades, puertos, casos de uso, envelope, errores.
+4. **Las pruebas**: traducidas de los criterios de aceptacion de cada HU.
 
 ---
 

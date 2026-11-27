@@ -314,6 +314,13 @@ proyecto.
 re-analisis reemplaza el resultado anterior o convive con el. La version anterior se
 conserva en ambos casos; la reemplazo queda como la opcion mas simple.
 
+**Cerrado al escribir HU-10.** La parte que faltaba —si el reanálisis reemplaza o convive—
+queda **decidida**: el resultado vigente se reemplaza y el anterior **convive en el
+historial** (ADR-25, tabla `analisis_historial`). Convivir por completo en
+`analisis_documentos` obligaria a relajar el `unique` sobre `documento_id` y a hacer
+ambigua la pregunta "cual es el analisis del documento". Lo que sigue abierto es
+**quien puede pedir un reanálisis** (PP-10) y **cuantas veces** (PP-09).
+
 
 
 ## DP-15 — Politica de retencion de los documentos archivados — CERRADA (por ahora)
@@ -363,11 +370,19 @@ que son documentos de trabajo y no la fuente de verdad.
 | PP-06 | **Permisos de campo**: ver un dato pero no editarlo | HU-02 fuera de alcance 6 | Bajo. Es una decision de negocio, no tecnica |
 | PP-07 | Un usuario **sin `organizacion_id`** puede iniciar sesion pero no operar | HU-01 SP-08 | Bajo. Falta confirmar si debe bloquearse antes |
 | PP-08 | La gestion de **roles `is_system` en caliente** (sin migracion) | HU-02 supuesto 3 | Bajo. Hoy solo se cambian por migracion |
+| PP-09 | El **limite de reananalisis por documento y por dia** | HU-10 variable `max_reanalisis_por_dia` | Bajo. Se fija cuando el cliente diga cuanto se reanaliza. Sin limite, el historial crece sin control |
+| PP-10 | **Quien puede pedir un reanálisis**: cualquiera con `documentos.analizar` o solo un admin | HU-10 variable `permitir_reanalisis` | Medio. Es una politica del cliente. El interruptor por organizacion ya esta previsto |
+| PP-11 | El **nombre definitivo del campo** que enlaza un analisis del historial con el que lo sustituyo | HU-10 seccion de modelo de datos | Bajo. Es una decision de la migracion. Se documenta `reemplazado_por` como nombre provisional |
+| PP-12 | La **duracion de la URL firmada** de descarga | HU-09 variable `duracion_url_firmada` | Bajo. Se asume 1 hora. Confirmar con el cliente |
+| PP-13 | Los **campos de riesgo concretos** que se extraen | HU-07 seccion 4, HU-10 comparacion de hallazgos | **Alto.** Depende del cliente. Sin esto la plantilla de extraccion sigue siendo generica y la demo no muestra el valor real |
 
 **Supuesto mientras no se cierren:** se implementa lo minimo que las HU de la v1 necesitan.
 PP-01 es el unico que toca el modelo de datos, y la decision ya esta tomada en el sentido de
 **una organizacion activa por peticion**, con el resto como soporte para cuando el cliente
 lo pida.
+
+**PP-13 es el mas urgente de los nuevos:** sin los campos de riesgo concretos, la
+extraccion es una demo generica. Es informacion que solo tiene el cliente.
 
 ---
 
