@@ -14,7 +14,7 @@
 
 `[DECIDIDO]` Combinacion actual y estable para trabajar en conjunto. **Las versiones se
 fijan con pin exacto** en `pyproject.toml` y `package.json`: un stack que se mueve solo es
-un stack que se rompe en silencio, y el breakage aparece en produccion, no en el
+un stack que se rompe en silencio, y la ruptura aparece en produccion, no en el
 `pyproject.toml`.
 
 ### 1.0 Versiones fijadas
