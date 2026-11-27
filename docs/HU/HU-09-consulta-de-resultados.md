@@ -255,7 +255,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | EC-01 | El usuario **no pertenece a ninguna organizacion** | Solo ve sus propios documentos. La pertenencia nula no le da acceso a nada |
 | EC-02 | El documento esta **completado pero sin resumen ejecutivo** (la plantilla no lo exige) | Se devuelve `resumen_ejecutivo = null`. La UI lo muestra como "sin resumen". No es un error |
 | EC-03 | El analisis tiene **0 bloques** | `total_bloques = 0` y la lista de resumenes vacia. La UI lo dice |
-| EC-04 | El documento tiene **1 solo bloque** | Se devuelve igual que con 34. La paginacion del detalle no muestra controles inútiles |
+| EC-04 | El documento tiene **1 solo bloque** | Se devuelve igual que con 50. La paginacion del detalle no muestra controles inútiles |
 | EC-05 | El **total de la lista es 0** | `total = 0`, `totalPages = 0`, `hasNext = false`. La UI muestra el estado vacio |
 | EC-06 | La **plantilla se desactivo** despues del analisis | El analisis conserva su `plantilla_version`. Se muestra la version usada, no la plantilla activa |
 | EC-07 | El usuario pide **`ambito = organizacion`** y la organizacion tiene 500 documentos | Se pagina normal. El total es el de la organizacion |

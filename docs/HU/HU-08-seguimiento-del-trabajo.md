@@ -87,7 +87,7 @@ navegador. El navegador **reporta**; el servidor **decide**.
 | `duracion_latido_max_ms` | 30000 | Cada reporte de progreso lleva su propio latido |
 | `progreso_por_bloque` | derivado | `100 / total_bloques`, repartido por etapas. Ver abajo |
 | `max_intentos_reanudacion` | 3 | Intentos de reanudar un trabajo interrumpido desde la UI |
-| `tamaño_pagina_trabajos` | 20 | Pagina del listado de trabajos |
+| `tamano_pagina_trabajos` | 20 | Pagina del listado de trabajos |
 
 ### Reparto del progreso
 
