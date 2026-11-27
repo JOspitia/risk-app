@@ -553,7 +553,8 @@ class Configuracion(BaseSettings):
     supabase_anon_key: str
     supabase_service_role_key: str
 
-    # Solo para Alembic en desarrollo. No es parte del camino de ejecucion.
+    # Solo para el script de validacion de migraciones en desarrollo.
+    # No es parte del camino de ejecucion.
     database_url: str
 
     max_upload_mb: int = 50
@@ -575,11 +576,11 @@ Estos son el ciclo de feedback. Deben existir antes de escribir codigo.
 
 ```
 uv sync                        # instala dependencias
-supabase start                 # stack local: Postgres + Auth + PostgREST
-supabase db reset              # destruye y recrea la base  <- la forma mas rapida de probar
-supabase migration new         # crea una migracion nueva
-uv run alembic upgrade head    # aplica migraciones pendientes
-                                 #   que las migraciones aplican limpio
+supabase start                 # stack local: Postgres + Auth + PostgREST + Storage
+supabase db reset              # destruye y recrea la base desde las migraciones
+                               #   <- la forma mas rapida de probar
+supabase migration new         # crea una migracion nueva (SQL puro)
+supabase db push               # aplica las migraciones al proyecto de Supabase
 uv run pytest                  # suite completa
 uv run pytest -m unit          # solo unitarias, sin base de datos
 uv run pytest -m integration   # contra Supabase real
@@ -588,6 +589,11 @@ uv run ruff format .           # formato
 uv run mypy app                # tipos
 uv run fastapi dev             # servidor local con recarga
 ```
+
+> **Una sola herramienta de migraciones.** El esquema vive en `supabase/migrations/*.sql` y
+> lo aplica el CLI de Supabase. **No hay Alembic** en este proyecto (ADR-32): las dos
+> herramientas sobre la misma base se pisarian, porque `supabase db reset` borra la tabla
+> `alembic_version` y Alembic no sabe desplegar hacia Supabase Cloud.
 
 > **Revisa el paso de build que realmente usas.** Un comando que compila solo las fuentes
 > de produccion reporta exito aunque las pruebas no compilen. Prefiere el que compila todo.

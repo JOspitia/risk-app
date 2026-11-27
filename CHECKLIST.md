@@ -23,8 +23,12 @@
 
 ## Gate 1 — Esquema y migraciones
 
-- [ ] Las migraciones se aplican limpiamente contra una base **vacia** (`alembic upgrade head`)
+- [ ] Las migraciones se aplican limpiamente contra una base **vacia** (`supabase db reset`)
 - [ ] El historial muestra todas las versiones aplicadas con exito
+- [ ] **Una sola herramienta de migraciones**: SQL en `supabase/migrations/`. No hay Alembic
+      ni tabla `alembic_version` (ADR-32)
+- [ ] `supabase db push` aplica el mismo esquema en el proyecto de Supabase que el que se
+      valido en local
 - [ ] No hay auto-baseline activado fuera de adopcion de produccion
 - [ ] Ninguna migracion ya aplicada fue editada despues
 - [ ] Sin coma trailing antes del `)` de cierre de una definicion

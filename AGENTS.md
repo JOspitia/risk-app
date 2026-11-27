@@ -133,7 +133,8 @@ Los nombres exactos se fijan al crear el `pyproject.toml`. Convencion:
 
 ```
 uv sync                # instala dependencias
-uv run alembic upgrade head    # aplica migraciones
+supabase db reset      # aplica las migraciones en la base local (ADR-32)
+supabase db push       # aplica las migraciones en el proyecto de Supabase
 uv run pytest          # suite completa
 uv run pytest -m unit  # solo unitarias, sin base de datos
 uv run ruff check .    # lint

@@ -107,7 +107,7 @@ Windows, y **Safari 26 en macOS Tahoe 26 / iOS 26** — no en macOS 15 ni anteri
 | Gestor de dependencias | `uv` | Recomendado por FastAPI; alternativa `pip` + venv |
 | Validacion y config | `pydantic` v2 + `pydantic-settings` | `pydantic-settings` para leer `.env` |
 | Acceso a datos | **Cliente HTTP de Supabase (PostgREST)** | Ver ADR-04. Sin `asyncpg` en el camino caliente |
-| Migraciones | `alembic` | Conexion directa a Postgres, solo en desarrollo |
+| Migraciones | **Supabase CLI** (`supabase/migrations/*.sql`) | Una sola fuente de verdad. Ver ADR-32 |
 | ETL de PDF (v2, servidor) | `pymupdf` (fitz), `docling` para OCR | Segun necesidad de OCR (DP-03) |
 | LLM en navegador | `@mlc-ai/web-llm` + `pdf.js` | Camino principal de la v1 |
 | LLM en servidor (v2) | `ollama` (cliente HTTP) o `vllm` | Solo para el modo servidor |
@@ -119,8 +119,9 @@ Windows, y **Safari 26 en macOS Tahoe 26 / iOS 26** — no en macOS 15 ni anteri
 **El conjunto de dependencias del backend es deliberadamente ligero.** La inferencia ocurre
 en el navegador, asi que Python no carga con el peso de la IA: no hay `torch`, ni `numpy`
 con ruedas pesadas, ni servidor de modelos. El nucleo es `fastapi[standard]`, `pydantic`,
-`httpx` y el SDK de Supabase, mas `alembic` para migrar y `pytest` para probar. Una
-dependencia que no justifique su peso se rechaza en la revision.
+`httpx` y el SDK de Supabase, mas `pytest` para probar. **No hay Alembic**: las
+migraciones son SQL que aplica el CLI de Supabase (ADR-32). Una dependencia que no
+justifique su peso se rechaza en la revision.
 
 ### 1.3 Toolchain del frontend
 
@@ -250,11 +251,8 @@ Risk-app/
 ├── backend/
 │   ├── pyproject.toml
 │   ├── Dockerfile                # entorno local y futuro despliegue self-hosted
-│   ├── alembic.ini
-│   ├── alembic/versions/
 │   ├── api/index.py              # handler de Vercel (@vercel/python) que expone `app`
-│   ├── app/
-│   │   ├── main.py               # composicion: app FastAPI + routers + handlers
+│   ├── app/│   │   ├── main.py               # composicion: app FastAPI + routers + handlers
 │   │   ├── config.py             # pydantic-settings; falla al arrancar si falta config
 │   │   ├── domain/               # SIN dependencias de framework ni de infra
 │   │   │   ├── entities/         #   documento.py, bloque.py, analisis.py, plantilla.py
@@ -284,6 +282,17 @@ Risk-app/
 │       ├── unit/                 #   dominio y casos de uso, sin DB ni red
 │       ├── integration/          #   contra Supabase real
 │       └── contract/             #   OpenAPI snapshot + envelope
+├── supabase/                     #   configuracion y migraciones (ADR-32)
+│   ├── config.toml
+│   ├── migrations/               #   *.sql, la unica fuente de verdad del esquema
+│   │   ├── 001_esquema_inicial.sql
+│   │   ├── 002_rls.sql
+│   │   ├── 003_permisos_y_roles.sql
+│   │   ├── 004_bucket_y_storage.sql
+│   │   └── 005_funciones_rpc.sql
+│   └── seed.sql                  #   datos semilla: roles, permisos, plantilla v1
+├── shared/                       #   fixtures compartidas entre Python y TypeScript
+│   └── chunking-casos.json       #   casos dorados del troceado (ver §5.4)
 └── frontend/
     ├── package.json
     ├── vite.config.ts
@@ -345,8 +354,9 @@ equipo), `Rol`, `Permiso` y `RolPermiso` (matriz de permisos granular).
 
 ## 5. Modelo de datos
 
-`[DECIDIDO]` PostgreSQL en Supabase. Migraciones con Alembic. El esquema nunca se edita a
-mano: cada cambio es una migracion nueva.
+`[DECIDIDO]` PostgreSQL en Supabase. **Migraciones con el CLI de Supabase** (SQL puro en
+`supabase/migrations/`). El esquema nunca se edita a mano: cada cambio es una migracion
+nueva. Ver ADR-32.
 
 ### 5.1 Tablas
 
@@ -1331,8 +1341,8 @@ Consecuencias que hay que aceptar:
   "crear documento + N bloques + analisis" se resuelve con una **funcion de Postgres**
   (`security definer`, con sus propias comprobaciones de RLS) llamada por RPC. La
   transaccion vive dentro de la base de datos, donde pertenece.
-- **Alembic si necesita una conexion directa** a Postgres, pero solo en desarrollo y en
-  el paso de migracion. No es parte del camino de ejecucion.
+- **Las migraciones se aplican con el CLI de Supabase**, no con Alembic. `supabase db push`
+  en el despliegue y `supabase db reset` en local. Ver ADR-32.
 - El filtrado por RLS sigue funcionando: si el backend reenvia el `Authorization: Bearer`
   del usuario, PostgREST lo usa para evaluar las politicas. Es el mecanismo correcto.
 
@@ -1455,6 +1465,8 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-28 | El pin del stack se ajusta a lo que la plataforma de despliegue soporta, no a la ultima version publicada | 2026-11-27 | Aceptada | Python 3.15.2 y TypeScript 7.0.2 son las ultimas versiones de sus respectivos registros, pero **Vercel Functions no ofrece Python 3.15** y **TypeScript 7 rompe `vue-tsc`**. Fijar lo mas nuevo que existe es una promesa que el despliegue no puede cumplir: el error aparece en el primer deploy, no en la revision. Ver 1.0.1 y 1.0.2 |
 | ADR-29 | El ciclo de vida de un analisis son seis endpoints: documento, subida, archivo, trabajo, progreso y resultado | 2026-11-27 | Aceptada | `POST /documentos` se usaba tanto para crear el documento como para entregar el resultado: dos operaciones con permisos y precondiciones distintas sobre la misma ruta. Ademas el resultado no puede entregarse al crear el documento, porque todavia no se sabe si el analisis va a funcionar. El documento es la entrada, el trabajo es el proceso, y el resultado llega al final. Ver seccion 7.0 |
 | ADR-30 | La respuesta es 403 cuando falta el permiso y 404 cuando la fila no existe; el permiso se comprueba antes que la fila | 2026-11-27 | Aceptada | La mitad de los documentos exigia 403 y la otra mitad 404, para el mismo caso. Ademas hay una restriccion tecnica: cuando RLS filtra una fila de otra organizacion, Postgres devuelve cero filas, y el caso de uso no puede distinguir "no existe" de "ocultado" sin usar `service_role`, que esta prohibido. Comprobar el permiso primero resuelve las dos cosas: si falta, 403 sin consultar nada; si esta, la consulta ya aplico RLS y lo que no aparece es 404 |
+| ADR-31 | El backend valida el JWT de Supabase contra el JWKS del proyecto y el cierre de sesion se hace efectivo de inmediato | 2026-11-27 | Aceptada | El emisor real es `{SUPABASE_URL}/auth/v1`; exigir una cadena propia rechazaba todos los tokens reales. Y un JWT stateless no sabe que la sesion se cerro: `signOut()` revoca el refresh token, pero el access token sigue valido hasta su `exp`. Sin un registro de `session_id` revocados, el criterio "401 de inmediato" es falso. El costo es una consulta local indexada, contra una llamada de red por peticion que haria el enfoque alternativo |
+| ADR-32 | Las migraciones son SQL puro en `supabase/migrations/`, aplicadas con el CLI de Supabase | 2026-11-27 | Aceptada | Alembic y el CLI de Supabase sobre la misma base se pisan: `supabase db reset` ejecuta el SQL de `supabase/migrations/` y borra la tabla `alembic_version`, y Alembic no sabe desplegar hacia Supabase Cloud. Como el proyecto ya usa el CLI para el stack local, tener las dos herramientas es una fuente de verdad doble. Ademas el CLI es el unico que sabe aplicar las politicas de `storage.buckets` y `storage.objects`, que Alembic no gestiona |
 
 ### 10.1 Como se registra una decision nueva
 
