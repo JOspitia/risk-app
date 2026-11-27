@@ -350,7 +350,7 @@ El indice parcial `trabajos (estado, ultimo_latido_en)` soporta la consulta de e
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-09: El progreso se calcula por fraccion de trabajo
-**Dado** un documento de 34 bloques
+**Dado** un documento de 50 bloques
 **Cuando** se completan 17 bloques
 **Entonces** el progreso informado incluye la fraccion de bloques completados
 **Y** no se proyecta por tiempo transcurrido
@@ -384,7 +384,7 @@ El indice parcial `trabajos (estado, ultimo_latido_en)` soporta la consulta de e
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-14: El analisis no bloquea la interfaz
-**Dado** un documento de 34 bloques
+**Dado** un documento de 50 bloques
 **Cuando** se analiza
 **Entonces** la interfaz sigue respondiendo durante todo el analisis
 **Y** el trabajo pesado corre en el Web Worker

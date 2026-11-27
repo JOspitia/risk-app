@@ -401,6 +401,10 @@ create table perfiles (
   apellido_1                text not null,
   apellido_2                text,
   display_name              text,
+  -- Correo del usuario. Se copia desde `auth.users` al crear la cuenta, para que el
+  -- listado de usuarios no tenga que leer `auth.users` con `service_role` en cada
+  -- peticion. `auth.users` sigue siendo la fuente de verdad; esta es una copia.
+  correo                    text not null,
   -- True mientras la credencial sigue siendo la autogenerada y enviada por correo.
   -- Se limpia en el primer inicio de sesion con cambio de contrasena.
   debe_cambiar_contrasena    boolean not null default false,
@@ -798,6 +802,22 @@ por el usuario `admin`.
 **contrasena autogenerada** que se envia al correo del usuario, seguida de la confirmacion de
 la cuenta.
 
+**El primer administrador no se crea con SQL.** Insertar el primer usuario `admin` con un
+`insert` en `auth.users` es fragil: Supabase espera filas coordinadas en `auth.users` y
+`auth.identities`, con el formato interno de GoTrue, y ese formato cambia entre versiones.
+Lo que hace el proyecto es un **script de bootstrap idempotente** que usa la API de
+administracion de Supabase (`service_role`) despues de aplicar las migraciones:
+
+```
+uv run python -m scripts.bootstrap_admin --correo admin@ejemplo.com --organizacion "<nombre>"
+```
+
+El script es idempotente: si el correo ya existe, actualiza el perfil y no crea un
+duplicado. Se ejecuta **una vez**, despues de `supabase db push` y antes de que la
+aplicacion se use. Es el unico lugar del proyecto que usa `service_role` para crear
+usuarios por consola, y esta justificado porque no hay todavia ningun `admin` que pueda
+hacerlo desde la interfaz.
+
 **Flujo.**
 
 ```
@@ -1039,7 +1059,7 @@ contexto del modelo activo.
 
 | Motor | Ventana | Paginas por bloque (aprox.) | Reduce jerarquico |
 |---|---|---|---|
-| Modelos de navegador (WebLLM) | 4.096 | 3 | Necesario: 100 paginas producen ~34 resumenes |
+| Modelos de navegador (WebLLM) | 4.096 | 3 | Necesario: 100 paginas producen ~50 resumenes |
 | Modelo pequeno en servidor | 8.192 | 8 | Necesario |
 | Proveedor hospedado con ventana grande | 200.000 | ~200 (el documento entero) | Innecesario: cabe en una sola pasada |
 
@@ -1050,8 +1070,8 @@ ventana grande, sin cambiar codigo.
 Consecuencias que se deducen del camino:
 
 - **El solapamiento tambien consume ventana.** `overlap_paginas` se resta antes de dividir.
-- **El Reduce puede desbordarse.** Con 100 paginas y bloques de 3, salen ~34 resumenes
-  parciales. A 200 tokens cada uno son ~6.800 tokens: no cabe en 4K. El Reduce debe ser
+- **El Reduce puede desbordarse.** Con 100 paginas y bloques de 3, salen ~50 resumenes
+  parciales. A 200 tokens cada uno son ~10.000 tokens: no cabe en 4K. El Reduce debe ser
   **jerarquico**: se agrupan los resumenes en lotes que quepan y se reduce cada lote, y
   luego se reducen los resultados intermedios. Para documentos de hasta ~200 paginas cabe
   en dos niveles.
@@ -1167,7 +1187,7 @@ cambia.
 
 - `progreso` es un entero de 0 a 100 y **nunca disminuye**. Escriba quien lo escriba.
 - `progreso` se calcula por fraccion de trabajo conocido, no por tiempo transcurrido: con 34
-  bloques, cada bloque vale ~2.9 puntos. Proyectar por tiempo miente cuando un bloque es
+  bloques, cada bloque vale ~1.7 puntos. Proyectar por tiempo miente cuando un bloque es
   mas lento que otros.
 - `paso_actual` es texto para humanos: "analizando bloque 7 de 34". No es un estado de
   maquina: es la ultima cosa que el usuario quiere leer.
@@ -1610,7 +1630,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-06 | LLM ejecutado en el navegador del usuario como camino principal | 2026-11-27 | Aceptada | Privacidad maxima (el documento no sale del equipo), cero costo de GPU, y encaja con Vercel: sin ETL pesado en el servidor. DP-11 lo confirma: sin modelo hospedado, la v1 no necesita GPU, ni worker, ni cola en el servidor |
 | ADR-07 | Despliegue en niveles: Vercel (frontend + API), Supabase (datos), Docker (entorno local) | 2026-11-27 | Aceptada | Vercel no ejecuta Docker en produccion; el Dockerfile sirve para reproducibilidad local y para el camino a servidor privado |
 | ADR-08 | El tamano de bloque se deriva de la ventana de contexto del modelo | 2026-11-27 | Aceptada | Los modelos de WebLLM vienen con 4K de contexto; 10 paginas desbordan la ventana |
-| ADR-09 | El Reduce es jerarquico | 2026-11-27 | Aceptada | Con bloques de 3 paginas, 100 paginas producen ~34 resumenes que no caben en 4K |
+| ADR-09 | El Reduce es jerarquico | 2026-11-27 | Aceptada | Con bloques de 3 paginas, 100 paginas producen ~50 resumenes que no caben en 4K |
 | ADR-10 | La cola de analisis vive en el cliente (Web Worker); el servidor solo lleva el estado | 2026-11-27 | Aceptada | El LLM corre en el navegador, asi que no hay cola en el servidor. El `pgmq` queda documentado para un eventual modo hospedado, no se construye en la v1 |
 | ADR-11 | Documentos digitales con capa de texto; sin OCR en la v1 | 2026-11-27 | Aceptada | Un PDF escaneado se marca como error explicito, nunca como analisis vacio |
 | ADR-12 | Sistema de roles y permisos granular, con la matriz en datos | 2026-11-27 | Aceptada | El objetivo declarado es controlar que informacion ve cada usuario. La matriz en tablas permite agregar permisos sin desplegar |

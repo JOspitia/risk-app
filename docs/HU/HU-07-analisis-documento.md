@@ -122,7 +122,7 @@ La plantilla tiene hoy una instruccion generica.
    JSON invalidos, pero **no los elimina**, y en cualquier caso **la validacion del backend
    es obligatoria**: el cliente no es una frontera de confianza.
 6. El **Reduce es jerarquico** cuando los resumenes parciales no caben en la ventana. Con
-   3 paginas por bloque, 100 paginas producen ~34 resumenes, que no caben en 4K.
+   3 paginas por bloque, 100 paginas producen ~50 resumenes, que no caben en 4K.
 7. La **temperatura** es baja (0.1). El modelo debe extraer, no redactar.
 8. El analisis **no se puede pausar ni reanudar**. Si el Web Worker muere, el trabajo se
    abandona (HU-08).
@@ -194,7 +194,7 @@ bloques y el backend recibe 34, ambos coinciden.
    - si no valida, reintenta hasta 2 veces incorporando el error de validacion en el prompt,
    - si sigue fallando, se detiene con un error explicito,
    - reporta el avance.
-3. Al terminar, tiene 34 resumenes parciales.
+3. Al terminar, tiene 50 resumenes parciales.
 
 ### 7.4 Reduce
 
@@ -328,7 +328,7 @@ error
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-09: El progreso se reporta
-**Dado** un documento de 34 bloques
+**Dado** un documento de 50 bloques
 **Cuando** se procesa
 **Entonces** el cliente reporta avance en cada bloque, con el bloque actual y el total
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

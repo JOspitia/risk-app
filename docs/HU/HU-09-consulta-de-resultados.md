@@ -333,7 +333,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-09: El detalle por bloque dice de que pagina salio cada dato
-**Dado** un analisis de 34 bloques
+**Dado** un analisis de 50 bloques
 **Cuando** se consulta el detalle por bloques
 **Entonces** cada bloque trae su indice, su rango de paginas y sus datos estructurados
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

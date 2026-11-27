@@ -1552,7 +1552,7 @@ contexto del modelo activo.
 
 | Motor | Ventana | Paginas por bloque | Reduce jerarquico |
 |---|---|---|---|
-| Modelos de navegador (WebLLM) | 4.096 | 3 | Necesario (~34 resumenes en 100 paginas) |
+| Modelos de navegador (WebLLM) | 4.096 | 3 | Necesario (~50 resumenes en 100 paginas) |
 | Modelo pequeno en servidor | 8.192 | 8 | Necesario |
 | Proveedor hospedado de ventana grande | 200.000 | ~200 | Innecesario: cabe en una pasada |
 
@@ -1560,8 +1560,8 @@ Cuando el motor cambia, el valor derivado cambia solo. Por eso el motor es confi
 usuario y por organizacion, y por eso un bloque de 3 paginas no es un supuesto codificado:
 es el resultado de una formula con la ventana del modelo que se este usando.
 
-**El Reduce jerarquico.** Con 3 paginas por bloque, 100 paginas producen ~34 resumenes
-parciales. A ~200 tokens cada uno son ~6.800 tokens: no caben en 4K. El Reduce agrupa los
+**El Reduce jerarquico.** Con 3 paginas por bloque, 100 paginas producen ~50 resumenes
+parciales. A ~200 tokens cada uno son ~10.000 tokens: no caben en 4K. El Reduce agrupa los
 resumenes en lotes que quepan, reduce cada lote, y reduce los resultados intermedios.
 
 ```python
@@ -1731,7 +1731,7 @@ modo.
 
 - `progreso` es un entero de 0 a 100 y **nunca disminuye**. Escriba quien lo escriba.
 - `progreso` se calcula por **fraccion de trabajo conocido**, no por tiempo transcurrido:
-  con 34 bloques, cada bloque vale ~2.9 puntos. Proyectar por tiempo miente cuando un
+  con 50 bloques, cada bloque vale ~1.7 puntos. Proyectar por tiempo miente cuando un
   bloque es mas lento que los demas.
 - `paso_actual` es texto para humanos ("analizando bloque 7 de 34"), no un estado de
   maquina: es lo ultimo que el usuario quiere leer.

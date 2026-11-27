@@ -101,9 +101,17 @@ en el log y el flujo se prueba sin contratar nada. En produccion, `resend` u otr
    reenviar una credencial nueva.
 3. La contrasena temporal se genera con un generador criptografico (`secrets`), **no** con
    `random`. Una contrasena predecible para un usuario recien creado es una puerta abierta.
-4. La cuenta se crea **sin confirmar** (`email_confirm = false`). La confirmacion la hace
-   el usuario desde el correo. `[PENDIENTE]` Si el cliente prefiere confirmar el correo
-   antes de que el usuario pueda entrar, se invierte el orden (supuesto 3 de la seccion 8).
+4. La cuenta se crea **con el correo confirmado** (`email_confirm = true`) y con la
+   credencial temporal en el correo. `[DECIDIDO]` Es lo unico que hace que la credencial
+   temporal sirva para algo: con `email_confirm = false`, `signInWithPassword` responde
+   "Email not confirmed" y el usuario **no puede entrar** hasta confirmar, con lo que la
+   clave del correo queda sin uso.
+   - El enlace del correo es de **confirmacion de la clave**, no de alta. Se genera con la
+     API de administracion de Supabase, como enlace de tipo *recovery*, no de tipo *signup*
+     ni *magiclink*: esos autentican al usuario en un paso, y entonces la contrasena
+     temporal sobra y confunde.
+   - El camino triste cuando el usuario intenta entrar **antes** de usar el enlace esta
+     documentado en SP-09.
 5. `perfiles.debe_cambiar_contrasena = true` hasta que el usuario cambie su clave. La
    interfaz lo fuerza **antes** de mostrar cualquier pantalla protegida.
 6. **Desactivar no es borrar.** Un usuario desactivado conserva su historia (documentos que
@@ -130,7 +138,13 @@ alter table perfiles
   add column nombres                 text,
   add column apellido_1              text,
   add column apellido_2              text,
-  add column debe_cambiar_contrasena boolean not null default false;
+  add column correo                  text,
+  add column debe_cambiar_contrasena boolean not null default false,
+  add column activo                  boolean not null default true;
+
+-- El correo se copia desde `auth.users` al crear la cuenta. Es una copia: la fuente de
+-- verdad sigue siendo `auth.users`. La razon de copiarla es que el listado de usuarios
+-- no debe leer `auth.users` con `service_role` en cada peticion.
 
 -- El nombre completo se arma en el Resource, no se duplica en la base.
 ```
@@ -166,7 +180,8 @@ POST /api/v1/usuarios
 5. El frontend llama a `POST /api/v1/usuarios`.
 6. El caso de uso comprueba el permiso `usuarios.gestionar`. Sin el, responde 403.
 7. El backend genera la contrasena temporal.
-8. El backend crea el usuario en Supabase con `email_confirm = false`.
+8. El backend crea el usuario en Supabase con `email_confirm = true` y la contrasena
+   temporal.
 9. El backend registra el perfil en `perfiles` con el rol, la organizacion y
    `debe_cambiar_contrasena = true`.
 10. El backend envia el correo con la credencial y el enlace de confirmacion.
@@ -246,6 +261,8 @@ POST /api/v1/usuarios
 | SP-10 | El administrador intenta cambiarse su propio rol a uno menor | 422 | 422 |
 | SP-11 | El administrador intenta modificar un usuario de otra organizacion | 403 | 403 |
 | SP-12 | El administrador intenta editar un usuario desactivado | Se permite reactivar, no editar el rol sin reactivarlo | 422 |
+| SP-13 | El usuario intenta entrar con la credencial temporal **antes** de usar el enlace del correo | Supabase responde "Email not confirmed". La UI lo explica en espanol y le dice que revise el correo. La credencial es valida: lo que falta es el enlace | 401 |
+| SP-14 | El correo ya existe en `auth.users` | 409. El administrador reenvia la credencial al usuario existente en vez de crear un duplicado | 409 |
 
 **SP-08 es el caso importante.** El orden correcto es: crear la cuenta, y si el correo falla,
 informar con precision. Si se creara la cuenta **despues** del correo, un correo duplicado

@@ -151,7 +151,7 @@ unicamente resultados ya extraidos y validados.
   documento completo.
 
 `[DECIDIDO]` **El Reduce es jerarquico.** Con el tamano de bloque por defecto, un documento
-de 100 paginas produce alrededor de 34 resumenes parciales, que no caben en la ventana de
+de 100 paginas produce alrededor de 50 resumenes parciales, que no caben en la ventana de
 contexto de un modelo de navegador. Se agrupan en lotes que quepan, se reduce cada lote, y
 se reducen los resultados intermedios. Para documentos de hasta ~200 paginas cabe en dos
 niveles.
@@ -336,11 +336,11 @@ El modelo de datos completo esta en [ARQUITECTURA.md](ARQUITECTURA.md#5-modelo-d
 | RF-07 | Consolidar los analisis parciales en un resumen ejecutivo, de forma jerarquica | `[DECIDIDO]` |
 | RF-08 | Persistir documento, bloques y analisis, con insercion por lotes | `[DECIDIDO]` |
 | RF-09 | Listar y consultar documentos y resultados, con paginacion y filtro por ambito | `[DECIDIDO]` |
-| RF-10 | Aplicar las politicas de visibilidad acordadas | `[ABIERTO]` DP-04 |
+| RF-10 | Aplicar las politicas de visibilidad acordadas | `[DECIDIDO]` DP-04 (cerrada). ADR-30, ADR-33 |
 | RF-11 | Consultar y editar plantillas de extraccion sin migrar la base de datos | `[DECIDIDO]` |
 | RF-12 | Reportar el estado del procesamiento (en proceso / completado / error) | `[DECIDIDO]` |
 | RF-13 | Detectar la capacidad del equipo y explicar cuando el modo navegador no es viable | `[DECIDIDO]` |
-| RF-14 | Ofrecer un camino que funcione para usuarios sin WebGPU | `[ABIERTO]` DP-11: se decidio **solo navegador**, sin modo hospedado |
+| RF-14 | Ofrecer un camino que funcione para usuarios sin WebGPU | `[DECIDIDO]` DP-11 (cerrada): **solo navegador**, sin modo hospedado. ADR-19. El camino es un equipo con WebGPU; no hay alternativa en la v1 |
 | RF-15 | Aplicar un **sistema de roles y permisos** que determine que informacion ve cada usuario | `[DECIDIDO]` |
 | RF-16 | **Administrar usuarios**: crear cuentas con nombres, apellidos, correo y contrasena autogenerada enviada por correo, asignar rol y organizacion, desactivar | `[DECIDIDO]` |
 | RF-17 | Reportar el avance de un analisis: **porcentaje, paso actual y tiempo transcurrido** | `[DECIDIDO]` |
