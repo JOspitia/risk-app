@@ -245,12 +245,6 @@ conserva en ambos casos; la reemplazo queda como la opcion mas simple.
 
 
 
-# Abiertas
-
-_Ninguna abierta. Todas las decisiones con impacto de arquitectura estan cerradas en la
-seccion de arriba. Las siguientes son preguntas de parametrizacion, no de diseno, y se
-responden con los datos del cliente cuando existan._
-
 ## DP-15 — Politica de retencion de los documentos archivados — CERRADA (por ahora)
 
 **Decision.** `[DECIDIDO]` **Supuesto por defecto: los documentos se conservan hasta que el
@@ -274,33 +268,35 @@ una expiracion automatica es una tarea de mantenimiento mas, no un cambio de mod
 - ¿Hay documentos que no se pueden eliminar (por obligacion legal) y que exijan una
   retencion mayor?
 
+# Abiertas
+
+_Ninguna abierta con impacto de arquitectura. Todas estan cerradas en la seccion de arriba.
+Las siguientes son preguntas de parametrizacion, no de diseno, y se responden con los datos
+del cliente cuando existan._
+
 ---
 
-# Preguntas de negocio heredadas del documento original
+# Pendientes detectados al escribir las historias de usuario
 
-**La pregunta, en palabras simples.** Hoy la plantilla de extraccion dice que hay que
-extraer fechas, montos y cláusulas. Mañana alguien agrega un campo "riesgo climatico". ¿Que
-pasa con los documentos que ya se analizaron con la plantilla vieja?**Las opciones.**
+Estos no surgieron de una decision de arquitectura, sino de **escribir los caminos de
+error** de cada historia. Se anotan aqui para que no se pierdan dentro de los `.md` de HU,
+que son documentos de trabajo y no la fuente de verdad.
 
-| Opcion | Que pasa |
-|---|---|
-| A. Los resultados viejos se quedan como estan | Cada analisis guarda la version de plantilla con la que se hizo. Se ve el resultado viejo con su plantilla vieja. Alguien puede re-analizar cuando quiera |
-| B. Todo se re-analiza automaticamente | Al cambiar la plantilla, se relanza el analisis de todos los documentos afectados |
-| C. Los resultados viejos se ocultan | Se marcan como "analizado con una plantilla anterior" y la UI los propone para re-analizar |
+| ID | Pendiente | Surge en | Impacto |
+|---|---|---|---|
+| PP-01 | Un usuario puede pertenecer a **varias organizaciones** con roles distintos. El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id` y el `AuditContext` no define como se elige la organizacion activa | HU-01 EC-06, HU-02 EC-02 | Medio. Afecta el modelo de contexto y el aislamiento |
+| PP-02 | **Sesion en cookie `httpOnly`** en lugar de `localStorage` | HU-01 supuesto 5 | Bajo por ahora. Depende de la politica de seguridad del cliente |
+| PP-03 | **SSO corporativo** (SAML u OIDC) | HU-01 fuera de alcance 8 | Bajo. Se resuelve con Supabase si el cliente lo pide |
+| PP-04 | **Roles personalizados** creados por el administrador | HU-02 fuera de alcance 4 | Bajo. Se resuelve con una fila mas en `roles` |
+| PP-05 | **Permisos individuales** por usuario, por encima del rol | HU-02 fuera de alcance 5 | Bajo. Requiere una tabla `usuario_permisos` |
+| PP-06 | **Permisos de campo**: ver un dato pero no editarlo | HU-02 fuera de alcance 6 | Bajo. Es una decision de negocio, no tecnica |
+| PP-07 | Un usuario **sin `organizacion_id`** puede iniciar sesion pero no operar | HU-01 SP-08 | Bajo. Falta confirmar si debe bloquearse antes |
+| PP-08 | La gestion de **roles `is_system` en caliente** (sin migracion) | HU-02 supuesto 3 | Bajo. Hoy solo se cambian por migracion |
 
-**Supuesto mientras no se cierre.** `[PROPUESTO]` **Opcion A, con una accion manual de
-re-analisis.** Es la que no rompe nada de golpe: el documento ya analizado conserva su
-resultado y su plantilla, y quien quiera actualizarlo lo pide explicitamente. La opcion B
-es una migracion silenciosa de datos, que es exactamente el tipo de operacion que se
-dispara sola y se lleva por delante resultados que nadie reviso.
-
-**Como se refleja en el codigo.** `analisis_documentos` ya tiene `plantilla_id` y
-`plantilla_version`. Con eso, la opcion A es el comportamiento por defecto: no hay que
-construir nada, solo no reescribir la historia.
-
-**Lo que falta definir.** Si la plantilla se versiona **por organizacion** (cada equipo la
-suya) o si hay una plantilla global de la institucion. Y si los documentos analizados por
-usuarios distintos usan la misma plantilla o la de su equipo.
+**Supuesto mientras no se cierren:** se implementa lo minimo que las HU de la v1 necesitan.
+PP-01 es el unico que toca el modelo de datos, y la decision ya esta tomada en el sentido de
+**una organizacion activa por peticion**, con el resto como soporte para cuando el cliente
+lo pida.
 
 ---
 
