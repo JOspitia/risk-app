@@ -149,15 +149,27 @@ npm run test           # tests del frontend
 
 ## 6. Version del stack
 
+**Pin exacto.** La tabla completa esta en [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)
+seccion 1.0 (ADR-27). Lo que se ve al retomar el proyecto:
+
 | Componente | Version | Verificado |
 |---|---|---|
 | Python | 3.15.2 | 2026-11-27 |
 | FastAPI | 0.165.0 | 2026-11-27 |
+| supabase (SDK de Python) | 2.34.1 | 2026-11-27 |
 | Vue | 3.5.46 | 2026-11-27 |
 | Vite | 8.4.0 | 2026-11-27 |
+| TypeScript | 7.0.2 | 2026-11-27 |
+| Node.js | 24 o 26 (LTS) | 2026-11-27 |
+| @supabase/supabase-js | 2.119.2 | 2026-11-27 |
+| @mlc-ai/web-llm | 0.2.89 | 2026-11-27 |
+| Supabase CLI | 3.4.0 | 2026-11-27 |
+| PostgreSQL | 17 (via Supabase) | 2026-11-27 |
 
-Si al retomar el proyecto una de estas versiones ya no es la actual, verificar y **registrar
-el cambio como ADR** antes de actualizar el codigo.
+Si al retomar el proyecto una de estas versiones ya no es la actual, verificar contra los
+registros oficiales (PyPI, npm, nodejs.org) y **registrar el cambio como ADR** antes de
+actualizar el codigo. La tabla de `ARQUITECTURA.md` seccion 1.0 es la unica fuente de
+verdad: las dos se actualizan en el mismo commit.
 
 ### 6.1 Decisiones vigentes que no se negocian sin ADR
 
