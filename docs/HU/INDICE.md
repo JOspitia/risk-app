@@ -4,7 +4,7 @@
 > feliz, los caminos de error y los **criterios de aceptacion** verificables.
 >
 > Que no duplican la especificacion tecnica: eso vive en [`../ARQUITECTURA.md`](../ARQUITECTURA.md)
-> (23 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
+> (26 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
 > **valor para el usuario** y el **como se comprueba que esta listo**.
 
 - **Estado:** vigente
@@ -19,9 +19,9 @@
 | Ya existe | Lo que aporta la HU |
 |---|---|
 | Requisitos funcionales (RF-01 a RF-25) en `CONTEXTO.md` | El **recorrido** del usuario, no la lista de capacidades |
-| 23 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
+| 26 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
 | Los 9 contratos de codigo del `SKILL.md` | Los **criterios de aceptacion** en formato PASS / FAIL |
-| 11 gates de verificacion en `CHECKLIST.md` | El **alcance**: que queda explicitamente fuera |
+| 17 gates de verificacion en `CHECKLIST.md` | El **alcance**: que queda explicitamente fuera |
 
 **Regla:** una HU no introduce datos de negocio que no existan. Si un campo o una regla no
 esta decidida, va marcado `[PENDIENTE]` y se anota en `DECISIONES-PENDIENTES.md`. No se
@@ -52,14 +52,14 @@ Todas las HU usan las mismas 10 secciones, en este orden:
 |---|---|---|---|
 | [HU-01](HU-01-acceso-y-sesion.md) | Acceso y sesion | RF-01, ADR-05 | Escrita |
 | [HU-02](HU-02-roles-y-permisos.md) | Roles y permisos | RF-15, ADR-12, ADR-17 | Escrita |
-| HU-03 | Administracion de usuarios | RF-16, ADR-13, ADR-18 | Pendiente |
-| HU-04 | Configuracion del motor IA | RF-02, RF-20, ADR-16 | Pendiente |
-| HU-05 | Compatibilidad del equipo y descarga del modelo | RF-13, ADR-06, ADR-19 | Pendiente |
-| HU-06 | Carga y archivo de un documento | RF-03, RF-22, ADR-20 | Pendiente |
-| HU-07 | Analisis del documento (ETL + Map-Reduce) | RF-04 a RF-07, ADR-08, ADR-09, ADR-11 | Pendiente |
-| HU-08 | Seguimiento del trabajo | RF-17, RF-18, RF-21, ADR-14 | Pendiente |
-| HU-09 | Consulta de resultados y descarga | RF-09, RF-19, RF-23, ADR-15 | Pendiente |
-| HU-10 | Reanalisis con la plantilla vigente | RF-24, DP-13, ADR-20 | Pendiente |
+| [HU-03](HU-03-administracion-usuarios.md) | Administracion de usuarios | RF-16, ADR-13, ADR-18 | Escrita |
+| [HU-04](HU-04-configuracion-motor.md) | Configuracion del motor IA | RF-02, RF-20, ADR-16 | Escrita |
+| [HU-05](HU-05-compatibilidad-y-descarga-modelo.md) | Compatibilidad del equipo y descarga del modelo | RF-13, ADR-06, ADR-19 | Escrita |
+| [HU-06](HU-06-carga-y-archivo.md) | Carga y archivo de un documento | RF-03, RF-22, ADR-20 | Escrita |
+| [HU-07](HU-07-analisis-documento.md) | Analisis del documento (ETL + Map-Reduce) | RF-04 a RF-07, ADR-08, ADR-09, ADR-11 | Escrita |
+| [HU-08](HU-08-seguimiento-del-trabajo.md) | Seguimiento del trabajo | RF-17, RF-18, RF-21, ADR-14 | Escrita |
+| [HU-09](HU-09-consulta-de-resultados.md) | Consulta de resultados y descarga | RF-09, RF-19, RF-23, ADR-15 | Escrita |
+| [HU-10](HU-10-reanalisis-con-plantilla-vigente.md) | Reanalisis con la plantilla vigente | RF-24, DP-13, ADR-20 | Escrita |
 
 ### 3.1 Orden de implementacion
 
