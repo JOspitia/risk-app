@@ -50,7 +50,7 @@ ejecuta en el navegador del usuario.
 | Area | Estado |
 |---|---|
 | Especificacion funcional | Completa. 25 RF + 9 RNF |
-| Decisiones de arquitectura | Completas. 26 ADR |
+| Decisiones de arquitectura | Completas. 27 ADR |
 | Decisiones de producto | Completas. 15 de 15 cerradas |
 | Historias de usuario | **10 de 10** escritas |
 | Metodo y contratos de codigo | Completo. `SKILL.md` |
@@ -206,7 +206,7 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `README.md` | Este brief | Primero, siempre |
 | `AGENTS.md` | Reglas del repositorio y orden de lectura | Antes de tocar nada |
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones | Para entender el **que** |
-| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **26 ADR** | Para entender el **como** |
+| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **27 ADR** | Para entender el **como** |
 | `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-13** | Para saber que esta abierto |
 | `docs/HU/INDICE.md` | Indice de historias de usuario y grafo de dependencias | Para planificar trabajo |
 | `docs/HU/HU-0*.md` | Historias de usuario completas | Antes de implementar una funcionalidad |
@@ -268,7 +268,7 @@ Aqui esta el trabajo real. Una IA externa es util sobre todo para esto:
 | 2 | **Criterios sin cobertura** | Un RF sin HU, una HU sin criterio de aceptacion, un ADR sin efecto en el codigo |
 | 3 | **Huecos de seguridad** | Un permiso que nadie comprueba, un endpoint sin regla de RLS, un dato sensible sin `Resource` |
 | 4 | **Casos de error no contemplados** | Caminos tristes y "estupidos" ausentes en las HU |
-| 5 | **Supuestos que ya no se sostienen** | Los `[PROPUESTO]` y `[PENDIENTE]`: hoy son 8 (PP-01 a PP-08), mas los marcados en las HU |
+| 5 | **Supuestos que ya no se sostienen** | Los `[PROPUESTO]` y `[PENDIENTE]`: hoy son 13 (PP-01 a PP-13), mas los marcados en las HU |
 | 6 | **Consecuencias no escritas** | Una decision que tenga un efecto que nadie documento (por ejemplo, cambiar de motor cambia el chunking) |
 | 7 | **Riesgos de operacion** | Los limites de la plataforma free, la pausa de Supabase, la cobertura de WebGPU |
 | 8 | **Deuda de la v1** | Lo que se aplazo y si el aplazamiento sigue siendo valido |
