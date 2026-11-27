@@ -5,7 +5,7 @@
 - **HU ID:** `HU-02`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-15 (sistema de roles y permisos que determina que informacion ve cada usuario)
+- **Cubre:** RF-15 (sistema de roles y permisos que determina que informacion ve cada usuario), RF-10 (aplicar las politicas de visibilidad acordadas)
 - **ADR relacionados:** ADR-12 (matriz en datos), ADR-17 (la visibilidad la decide el permiso)
 - **Bloquea:** HU-09 (consulta de resultados), y parte de HU-03
 - **Bloqueado por:** HU-01 (sesion), porque el permiso se comprueba en el caso de uso
@@ -129,7 +129,7 @@ medida que se implemente cada modulo, en la misma tabla y con el mismo procedimi
    aplicacion. Se cambia con una migracion, no con un click. `[PENDIENTE]` Confirmar si el
    cliente quiere gestion de roles en caliente.
 4. Un usuario desactivado **no puede hacer nada**, sin importar sus permisos. La
-   desactivacion es unaROW mas fuerte que el permiso.
+   desactivacion es una fila mas fuerte que el permiso.
 5. El permiso se comprueba **en el caso de uso**. El router puede comprobarlo tambien, pero
    no es el unico sitio donde se comprueba: una comprobacion unica en el router deja el
    hueco abierto en cuanto alguien llama al caso de uso desde otro camino.
@@ -326,11 +326,19 @@ async def ejecutar(self, cmd, ctx: AuditContext) -> list[Documento]:
 **Entonces** esta **dentro del caso de uso**, no solo en el router
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
-### CA-04: 403 y no 404 para un recurso prohibido
-**Dado** un documento que existe pero que el usuario no puede ver
+### CA-04: 403 cuando falta el permiso, 404 cuando la fila no existe
+**Dado** un documento de la organizacion del usuario sobre el que no tiene el permiso de la accion
 **Cuando** pide el detalle
 **Entonces** responde 403 con el codigo `prohibido`
 **Y** la respuesta **no** revela el contenido ni el nombre del recurso
+**Y** el permiso se comprueba **antes** de consultar la fila
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-04b: 404 para un recurso de otra organizacion
+**Dado** un documento que pertenece a otra organizacion
+**Cuando** se pide su detalle con un JWT valido
+**Entonces** responde 404 con el codigo `no_encontrado`
+**Y** la respuesta no confirma que ese identificador exista
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-05: Un usuario desactivado no hace nada

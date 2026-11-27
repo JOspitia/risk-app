@@ -201,8 +201,25 @@ create policy archivos_insertar on storage.objects
 1. El navegador hace el `PUT` del PDF **directo a Supabase Storage**, con la URL firmada.
 2. La UI muestra el progreso de la subida.
 3. El navegador llama a `POST /api/v1/documentos/{id}/archivo` para confirmar.
-4. El backend guarda `ruta_archivo`, `tamano_bytes` y `archivado_en`.
-5. Responde 200.
+4. El backend **consulta los metadatos del objeto** en Storage antes de confirmar:
+   existencia, `tamano_bytes` real y `content_type` guardado. Si no coinciden con lo que
+   declaro el cliente, responde 409 y no guarda la ruta. La ruta la genera el backend, no
+   el cliente.
+5. El backend guarda `ruta_archivo`, `tamano_bytes` y `archivado_en`.
+6. Responde 200.
+
+> **Por que el backend no valida los magic bytes.** Nunca ve el archivo: el PDF sube
+> directo del navegador al bucket y la funcion solo recibe un JSON con metadatos. La
+> validacion del tipo real ocurre **en el navegador**, antes de subir, y el bucket
+> restringe los MIME permitidos (`allowed_mime_types = ['application/pdf']`). Declarar en
+> el backend una comprobacion que no puede ejecutar seria documentar una defensa que el
+> codigo no ejecuta. Ver I-07 del informe de validacion.
+
+> **CORS en Supabase Storage.** El `PUT` firmado desde el origen del frontend requiere que
+> el proyecto tenga configurado el CORS de Storage para permitir `PUT`, `GET` y `HEAD` desde
+> los origenes de la aplicacion. Sin eso, la subida falla en produccion con un error de
+> CORS, no de permisos. Es parte de la configuracion del proyecto de Supabase, no del
+> codigo. Ver I-09 del informe de validacion.
 
 ### 7.4 Descargar despues
 
@@ -256,7 +273,7 @@ create policy archivos_insertar on storage.objects
 | CE-03 | El cliente envia un `nombre_archivo` con codigo de control | Se sanea. La UI escapa al renderizar |
 | CE-04 | El cliente intenta enviar `ruta_archivo` en el `POST` | Se ignora. La ruta la genera el backend, no el cliente |
 | CE-05 | El cliente intenta enviar `usuario_id` de otra persona | Se ignora. El usuario sale del token |
-| CE-06 | Un archivo con la extension `.pdf` pero que es un ZIP | El magic bytes no coincide. 415 |
+| CE-06 | Un archivo con la extension `.pdf` pero que es un ZIP | El navegador detecta el **magic bytes** antes de subir y **no sube**. El backend no ve el archivo, asi que no puede rechazarlo: lo que hace es confirmar contra los metadatos de Storage |
 | CE-07 | Un PDF valido con metadatos que contienen codigo JavaScript | Se archiva tal cual. **El backend nunca lo sirve como HTML**: la descarga es un `Content-Type: application/pdf` con `Content-Disposition: attachment` |
 | CE-08 | Dos subidas simultaneas del mismo documento | La segunda recibe 409 por el indice unico del hash |
 
@@ -337,4 +354,5 @@ create policy archivos_insertar on storage.objects
 **Cuando** se sirve la URL firmada
 **Entonces** el `Content-Type` es `application/pdf` y el `Content-Disposition` es
 `attachment`
+**Y** la URL se firma con la opcion de descarga, no con la de vista en linea
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

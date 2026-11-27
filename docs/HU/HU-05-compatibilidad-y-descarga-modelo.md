@@ -78,7 +78,7 @@ sola vez, y que se pida permiso de forma explicita.
 | Parametro | Default | Nota |
 |---|---|---|
 | `MODELO_POR_DEFECTO` | el que sugiera la deteccion | Ver HU-04 |
-| `TAMANO_MAXIMO_MODELO_MB` | `3072` | Above del limite de 3 GB |
+| `TAMANO_MAXIMO_MODELO_MB` | `3072` | Por encima del limite de 3 GB |
 | `MINIMO_VRAM_MB` | `1024` | Por debajo, se advierte en vez de bloquear |
 | `MARGEN_VRAM` | `0.15` | 15% de margen al elegir el modelo |
 | `TIMEOUT_DESCARGA_MS` | `600000` | 10 minutos. Si se supera, se cancela y se reintenta |
@@ -194,7 +194,29 @@ Faltan unos 4 minutos
 | EC-04 | La cache tiene el modelo pero con **otra version** | Se compara el identificador de version. Si no coincide, se vuelve a descargar |
 | EC-05 | El dispositivo es un celular con WebGPU | Funciona, pero con 4 GB de RAM la eleccion razonable es el modelo de 1B. La sugerencia lo tiene en cuenta |
 | EC-06 | El usuario cambia de modelo | Se descarga el nuevo. **El anterior no se borra automaticamente**: ocupa espacio. La UI lo dice y ofrece limpiarlo |
-| EC-07 | La aplicacion se usa sin conexion despues de la primera descarga | Todo el pipeline funciona: extraccion, analisis y guardado local de resultados. Solo falla el envio de los resultados al servidor, que queda en cola |
+| EC-07 | La aplicacion se usa sin conexion despues de la primera descarga | Todo el pipeline funciona: extraccion, analisis y guardado local de resultados. Solo falla el envio de los resultados al servidor, que queda en cola **en IndexedDB** |
+
+### La cola offline
+
+`[DECIDIDO]` **La cola de resultados sin conexion vive en IndexedDB.** No en `localStorage`:
+un documento de 100 paginas son 50 bloques, y con sus resumenes y datos estructurados el
+resultado no cabe en los ~5 MB de `localStorage`. IndexedDB no tiene ese limite.
+
+Tres reglas:
+
+1. **La cola sobrevive a cerrar la pestana.** IndexedDB es persistente; `localStorage`
+   tambien, pero aqui importa el limite de tamano, no la persistencia.
+2. **La renovacion de sesion la gestiona el cliente.** Si el JWT expiro durante el corte
+   de red, la cola espera a que el SDK de Supabase renueve el token. No se reintentan
+   peticiones con un token vencido: se espera la renovacion.
+3. **El trabajo no se marca `interrumpido` mientras estuvo offline.** El servidor no puede
+   saber que el cliente estaba desconectado. Por eso el margen de latido es de 2 minutos
+   y la expiracion es perezosa (ADR-24): si el cliente vuelve antes de que alguien mire el
+   trabajo, lo reanuda sin que nunca haya parecido abandonado.
+
+> **El `pdf.js` se empaqueta localmente.** Si se cargara desde un CDN, el modo sin conexion
+> no funcionaria: la extraccion fallaria por una dependencia de red que no existe. Ver
+> I-09 del informe de validacion.
 
 ### Casos "estupidos"
 
@@ -282,4 +304,7 @@ Faltan unos 4 minutos
 **Cuando** el usuario analiza un documento
 **Entonces** la extraccion y el analisis se completan
 **Y** los resultados quedan en cola para enviarse al servidor cuando vuelva la conexion
+**Y** la cola esta en **IndexedDB**, no en `localStorage`: 50 bloques con sus resumenes y
+datos estructurados no caben en el limite de `localStorage`
+**Y** la cola sobrevive a cerrar la pestana
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

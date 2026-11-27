@@ -5,7 +5,7 @@
 - **HU ID:** `HU-09`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-09 (listar y consultar documentos y resultados, con paginacion y filtro por ambito), RF-19 (entregar el resultado como JSON de resumenes por bloque mas el resumen ejecutivo, mapeado por DTO), RF-23 (descargar el documento mediante un enlace temporal, solo para quien tenga permiso)
+- **Cubre:** RF-09 (listar y consultar documentos y resultados, con paginacion y filtro por ambito), RF-19 (entregar el resultado como JSON de resumenes por bloque mas el resumen ejecutivo, mapeado por DTO), RF-23 (descargar el documento mediante un enlace temporal, solo para quien tenga permiso), RF-10 (aplicar las politicas de visibilidad acordadas)
 - **ADR relacionados:** ADR-15 (el resultado es un JSON de resumenes por bloque + resumen ejecutivo, entregado por DTO), ADR-17 (la visibilidad la determina el permiso), ADR-20 (el archivo esta en almacenamiento privado)
 - **Bloquea:** HU-10 (reanalisis)
 - **Bloqueado por:** HU-01 (sesion), HU-02 (permisos), HU-07 (el resultado existe)
@@ -71,7 +71,7 @@ Tres cosas resuelven la visibilidad, que es el objetivo declarado del sistema de
 
 ### Esta HU BLOQUEA
 
-- **HU-10**: el reanalyze parte de un documento archivado que se consulta desde aqui.
+- **HU-10**: el reanálisis parte de un documento archivado que se consulta desde aqui.
 
 ---
 
@@ -190,8 +190,10 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 
 1. El usuario abre un documento.
 2. El frontend llama a `GET /api/v1/documentos/{id}`.
-3. El backend comprueba el permiso y que el documento **es visible** para ese usuario. Si
-   no lo es, responde 404: un documento invisible no se distingue de uno que no existe.
+3. El backend comprueba **primero el permiso** y **despues la fila** (ADR-30):
+   - si falta el permiso que la accion exige, responde **403**,
+   - si el permiso esta pero la fila no aparece (no existe, o es de otra organizacion y RLS
+     la filtro), responde **404**.
 4. La respuesta trae nombre, paginas, estado, fechas, error si lo hay, y el estado del
    trabajo si sigue en proceso.
 5. Si el documento esta en proceso, el frontend consulta el trabajo y muestra el progreso.
@@ -227,14 +229,15 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | # | Escenario | Comportamiento del sistema | Codigo |
 |---|---|---|---|
 | SP-01 | El documento **no existe** | 404 | 404 |
-| SP-02 | El documento **existe pero el usuario no puede verlo** | 404. No se distingue del inexistente: no se confirma que hay algo ahi | 404 |
+| SP-02 | El documento es de **otra organizacion** | 404. RLS filtra la fila y la respuesta no confirma que ese identificador exista | 404 |
+| SP-02b | El documento es de la **misma organizacion** pero falta el permiso de la accion | 403. El usuario ya sabe que existe: esta en su equipo. Ocultarlo no aporta seguridad | 403 |
 | SP-03 | El usuario **no tiene `documentos.ver`** | 403. La ausencia de permiso se deniega | 403 |
 | SP-04 | Piden `ambito = organizacion` **sin `analisis.ver_todos`** | 200 con la lista propia. Menos resultados, no un error | 200 |
 | SP-05 | `size = 500` | Se recorta a 100. No es un error | 200 |
 | SP-06 | `page = 0` o `page = -1` | Se recorta a 1. No es un error | 200 |
 | SP-07 | `size = 0` | Se recorta al minimo (1). No es un error | 200 |
 | SP-08 | Se pide la **descarga** sin `archivos.descargar` | 403 | 403 |
-| SP-09 | El documento **no tiene archivo archivado** | 409. El documento se analysed pero el archivo no se guardo. Se explica en el mensaje | 409 |
+| SP-09 | El documento **no tiene archivo archivado** | 409. El documento se analizado pero el archivo no se guardo. Se explica en el mensaje | 409 |
 | SP-10 | La **URL firmada ya expiro** | El almacenamiento responde 400 o 403. La UI detecta que expiro y pide una nueva | error del almacenamiento |
 | SP-11 | El **analisis no existe todavia** (documento en proceso) | 404 en el endpoint de analisis, y el detalle muestra el progreso. No se devuelve un analisis vacio | 404 |
 | SP-12 | El **documento esta en error** | El detalle trae `error_mensaje`. El endpoint de analisis responde 404: no hay analisis | 404 |
@@ -252,7 +255,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | EC-01 | El usuario **no pertenece a ninguna organizacion** | Solo ve sus propios documentos. La pertenencia nula no le da acceso a nada |
 | EC-02 | El documento esta **completado pero sin resumen ejecutivo** (la plantilla no lo exige) | Se devuelve `resumen_ejecutivo = null`. La UI lo muestra como "sin resumen". No es un error |
 | EC-03 | El analisis tiene **0 bloques** | `total_bloques = 0` y la lista de resumenes vacia. La UI lo dice |
-| EC-04 | El documento tiene **1 solo bloque** | Se devuelve igual que con 34. La paginacion del detalle no muestra controles inútiles |
+| EC-04 | El documento tiene **1 solo bloque** | Se devuelve igual que con 50. La paginacion del detalle no muestra controles inútiles |
 | EC-05 | El **total de la lista es 0** | `total = 0`, `totalPages = 0`, `hasNext = false`. La UI muestra el estado vacio |
 | EC-06 | La **plantilla se desactivo** despues del analisis | El analisis conserva su `plantilla_version`. Se muestra la version usada, no la plantilla activa |
 | EC-07 | El usuario pide **`ambito = organizacion`** y la organizacion tiene 500 documentos | Se pagina normal. El total es el de la organizacion |
@@ -263,7 +266,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | # | Caso | Comportamiento del sistema |
 |---|---|---|
 | CE-01 | El usuario pide el detalle de un documento **con id inventado** | 404. Los UUID no se adivinan |
-| CE-02 | El usuario intenta ver el **analisis de otro usuario** de la misma organizacion | 404 si no tiene `analisis.ver_todos`; 200 si lo tiene. Decide el permiso |
+| CE-02 | El usuario intenta ver el **analisis de otro usuario** de la misma organizacion | 403 si no tiene `analisis.ver_todos`; 200 si lo tiene. Decide el permiso, y el permiso se comprueba antes de consultar |
 | CE-03 | El cliente pide **1000 bloques** en una sola llamada | Se recorta a 100 y se devuelven los metadatos de paginacion |
 | CE-04 | El usuario pide la **descarga 50 veces seguidas** | Cada peticion devuelve una URL nueva de 1 hora. No hay limite en la v1; se documenta como posible abuse |
 | CE-05 | El documento tiene **el nombre con caracteres raros** (comillas, saltos de linea) | Se escapa al serializar. La UI lo muestra literal, sin interpretaion de HTML |
@@ -281,11 +284,14 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 **Entonces** la respuesta no contiene `usuario_id`, `hash_sha256` ni `ruta_archivo`
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
-### CA-02: Un documento invisible no se distingue de uno inexistente
-**Dado** un documento de otro usuario sin permiso
+### CA-02: La respuesta distingue permiso de aislamiento
+**Dado** un documento de **otra organizacion**
 **Cuando** se pide su detalle
 **Entonces** la respuesta es 404
 **Y** el cuerpo no confirma que el documento existe
+**Dado** un documento de la **misma organizacion** sobre el que falta el permiso
+**Cuando** se pide su detalle
+**Entonces** la respuesta es 403
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-03: La paginacion trae metadatos
@@ -327,7 +333,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-09: El detalle por bloque dice de que pagina salio cada dato
-**Dado** un analisis de 34 bloques
+**Dado** un analisis de 50 bloques
 **Cuando** se consulta el detalle por bloques
 **Entonces** cada bloque trae su indice, su rango de paginas y sus datos estructurados
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

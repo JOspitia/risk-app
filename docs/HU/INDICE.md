@@ -4,7 +4,7 @@
 > feliz, los caminos de error y los **criterios de aceptacion** verificables.
 >
 > Que no duplican la especificacion tecnica: eso vive en [`../ARQUITECTURA.md`](../ARQUITECTURA.md)
-> (27 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
+> (34 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
 > **valor para el usuario** y el **como se comprueba que esta listo**.
 
 - **Estado:** vigente
@@ -19,7 +19,7 @@
 | Ya existe | Lo que aporta la HU |
 |---|---|
 | Requisitos funcionales (RF-01 a RF-25) en `CONTEXTO.md` | El **recorrido** del usuario, no la lista de capacidades |
-| 27 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
+| 34 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
 | Los 9 contratos de codigo del `SKILL.md` | Los **criterios de aceptacion** en formato PASS / FAIL |
 | 17 gates de verificacion en `CHECKLIST.md` | El **alcance**: que queda explicitamente fuera |
 
@@ -60,6 +60,8 @@ Todas las HU usan las mismas 10 secciones, en este orden:
 | [HU-08](HU-08-seguimiento-del-trabajo.md) | Seguimiento del trabajo | RF-17, RF-18, RF-21, ADR-14 | Escrita |
 | [HU-09](HU-09-consulta-de-resultados.md) | Consulta de resultados y descarga | RF-09, RF-19, RF-23, ADR-15 | Escrita |
 | [HU-10](HU-10-reanalisis-con-plantilla-vigente.md) | Reanalisis con la plantilla vigente | RF-24, DP-13, ADR-20 | Escrita |
+| [HU-11](HU-11-plantillas-de-extraccion.md) | Plantillas de extraccion | RF-11, ADR-34 | Escrita |
+| [HU-12](HU-12-eliminacion-de-documento.md) | Eliminacion de un documento y su archivo | RF-25, ADR-20, ADR-22 | Escrita |
 
 ### 3.1 Orden de implementacion
 
@@ -75,12 +77,22 @@ HU-01 (sesion)
    +-> HU-06 (carga) ----------> HU-07 (analisis) --> HU-08 (seguimiento)
    |                                                              |
    +--------------------------------------------------------------+--> HU-09 (consulta)
-                                                                       |
-                                                                       +--> HU-10 (reanalisis)
+   |                                                                      |
+   +-> HU-11 (plantillas) ---> HU-12 (eliminacion)                        |
+   |                                                                      |
+   +----------------------------------------------------------------------+--> HU-10 (reanalisis)
 ```
 
 **HU-01 es la unica bloqueante de todas.** Las demas se pueden construir en cualquier
 orden siempre que sus bloqueos esten resueltos.
+
+**HU-11 (plantillas) va antes que HU-07 (analisis) en la practica**, aunque no lo bloquee
+formalmente: el analisis necesita una plantilla que extraer, y la plantilla semilla v1
+viene en la migracion. Lo que bloquea HU-07 es que la semilla exista, no que la HU este
+terminada.
+
+**HU-12 (eliminacion) es la ultima**: necesita que exista el archivo archivado, que es
+HU-06.
 
 ---
 
@@ -93,7 +105,7 @@ orden siempre que sus bloqueos esten resueltos.
   FAIL significa que la HU no esta lista.
 - **Al hacer la demo:** el camino feliz de cada HU arma el guion. Si una HU no esta, la demo
   pierde un paso.
-- **Al integrar el frontend:** el `CHECKLIST.md` gate 8 (listo para el frontend) verifica que
+- **Al integrar el frontend:** el `CHECKLIST.md` gate 9 (listo para el frontend) verifica que
   la API cumple lo que las HU prometen.
 
 ---

@@ -23,8 +23,12 @@
 
 ## Gate 1 — Esquema y migraciones
 
-- [ ] Las migraciones se aplican limpiamente contra una base **vacia** (`alembic upgrade head`)
+- [ ] Las migraciones se aplican limpiamente contra una base **vacia** (`supabase db reset`)
 - [ ] El historial muestra todas las versiones aplicadas con exito
+- [ ] **Una sola herramienta de migraciones**: SQL en `supabase/migrations/`. No hay Alembic
+      ni tabla `alembic_version` (ADR-32)
+- [ ] `supabase db push` aplica el mismo esquema en el proyecto de Supabase que el que se
+      valido en local
 - [ ] No hay auto-baseline activado fuera de adopcion de produccion
 - [ ] Ninguna migracion ya aplicada fue editada despues
 - [ ] Sin coma trailing antes del `)` de cierre de una definicion
@@ -48,7 +52,9 @@
       una columna interna
 - [ ] El rol del usuario se verifica en el caso de uso, no solo en el router
 - [ ] Un usuario de otra organizacion recibe 403 o 404, nunca datos
-- [ ] El tipo real del archivo se valida (magic bytes), no solo la extension
+- [ ] El tipo real del archivo se valida en el **navegador** (magic bytes `%PDF-`) antes de
+      subir, y el bucketStorage restringe los MIME permitidos. El backend **no** declara
+      validar magic bytes: nunca ve el archivo (ver I-07 del informe de validacion)
 - [ ] El limite de tamano de archivo se aplica antes de leerlo en memoria
 - [ ] Los logs no contienen contenido del documento ni texto extraido
 - [ ] CORS no es `*` en un entorno con credenciales
@@ -72,7 +78,8 @@
 
 - [ ] El permiso se comprueba en el **caso de uso**, no solo en el router
 - [ ] Un permiso ausente se **deniega**: no hay "permitido por defecto"
-- [ ] Un recurso que existe pero no se puede ver produce **403**, no 404
+- [ ] Un recurso de **otra organizacion** produce **404**, nunca datos
+- [ ] Un recurso de la **misma organizacion** sin permiso produce **403**, no 404 (ADR-30)
 - [ ] La matriz de permisos vive en datos: agregar un permiso no requiere redesplegar
 - [ ] Un usuario sin permiso recibe 403 tambien en las rutas de escritura, no solo de lectura
 - [ ] El `service_role` solo se usa en el adaptador de administracion
@@ -118,7 +125,7 @@
 
 - [ ] El bucket es **privado**. No existe ninguna URL publica
 - [ ] El bucket declara `file_size_limit` y `allowed_mime_types`
-- [ ] El backend valida tamano y tipo MIM **antes** de firmar la URL de subida
+- [ ] El backend valida tamano y tipo MIME **antes** de firmar la URL de subida
 - [ ] Las politicas de `storage.objects` cubren insert, select y delete
 - [ ] La clave del objeto es `{organizacion_id}/{usuario_id}/{documento_id}.pdf`
 - [ ] Un usuario de otra organizacion no lee, no descarga y no lista los archivos
@@ -198,7 +205,9 @@
 ## Gate 8 — Pruebas
 
 - [ ] El dominio y los casos de uso tienen pruebas unitarias sin base de datos ni red
-- [ ] Las pruebas de integracion corren contra Postgres real en Docker
+- [ ] Las pruebas de integracion corren contra Supabase real (`supabase start`), no contra un
+      Postgres suelto: hacen falta Auth, PostgREST y Storage para que el aislamiento se
+      pruebe de verdad
 - [ ] Hay una prueba de ciclo de vida completo: crear -> leer -> actualizar -> borrar
 - [ ] Un intento de login en cuenta inactiva, bloqueada o eliminada es rechazado
 - [ ] Dos sesiones simultaneas funcionan ambas
@@ -237,7 +246,9 @@
 
 ## Gate 10 — Privacidad
 
-- [ ] El PDF original **no sale del equipo del usuario** en el camino principal
+- [ ] El analisis ocurre en el equipo del usuario; el archivo original **se archiva en
+      almacenamiento privado** del proyecto y **solo se elimina al borrar el documento**
+      (ADR-20)
 - [ ] Ningun texto extraido aparece en logs, traces ni metricas
 - [ ] Ningun texto extraido se persiste fuera de `datos_estructurados` y `resumen`, que son
       los resultados que el usuario pidio

@@ -154,8 +154,8 @@ usuarios (crear cuentas, asignar roles) es parte del alcance.
 
 ## DP-07 — Que hace el LLM — CERRADA (para la v1)
 
-**Decision.** `[DECIDIDO]` En la v1: el documento se divide en **34 bloques** (100 paginas a
-3 por bloque), cada bloque genera un resumen, y esos 34 resumenes se consolidan en un
+**Decision.** `[DECIDIDO]` En la v1: el documento se divide en **50 bloques** (100 paginas a
+3 por bloque), cada bloque genera un resumen, y esos 50 resumenes se consolidan en un
 **JSON unico** junto con el resumen ejecutivo. ADR-15.
 
 **Por que.** Es lo que el proyecto necesita hoy. La evolucion hacia responder preguntas
@@ -166,9 +166,9 @@ se guarda (`analisis_documentos.resumenes`) y el que consume la UI. Cada resumen
 su `indice` de bloque y su rango de paginas, que son las claves que permitiran indexar
 mas adelante para el RAG. Guardarlos bien hoy es la mitad del trabajo del RAG de manana.
 
-**Nota sobre los 34 bloques.** No es un numero fijo: sale de `total_paginas / 3` con el
+**Nota sobre los 50 bloques.** No es un numero fijo: sale de `total_paginas / 3` con el
 tamano de bloque derivado de la ventana de contexto. Para un documento de 40 paginas
-serian 14 bloques. El JSON no debe asumir 34.
+serian 20 bloques. El JSON no debe asumir 34.
 
 ## DP-08 — Hardware de los equipos — CERRADA
 

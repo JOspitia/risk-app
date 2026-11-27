@@ -5,7 +5,7 @@
 - **HU ID:** `HU-07`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-04 (extraer y limpiar el texto), RF-05 (dividir en bloques con tamano derivado), RF-06 (analizar cada bloque y extraer campos validos), RF-07 (consolidar en un resumen ejecutivo)
+- **Cubre:** RF-04 (extraer y limpiar el texto), RF-05 (dividir en bloques con tamano derivado), RF-06 (analizar cada bloque y extraer campos validos), RF-07 (consolidar en un resumen ejecutivo), RF-08 (persistir documento, bloques y analisis, con insercion por lotes)
 - **ADR relacionados:** ADR-08 (tamano derivado), ADR-09 (reduce jerarquico), ADR-11 (solo documentos digitales, sin OCR), ADR-06 (motor en el navegador), ADR-15 (artefacto JSON)
 - **Bloquea:** HU-08 (seguimiento), HU-09 (consulta de resultados)
 - **Bloqueado por:** HU-04 (configuracion), HU-05 (modelo descargado), HU-06 (documento registrado)
@@ -122,7 +122,7 @@ La plantilla tiene hoy una instruccion generica.
    JSON invalidos, pero **no los elimina**, y en cualquier caso **la validacion del backend
    es obligatoria**: el cliente no es una frontera de confianza.
 6. El **Reduce es jerarquico** cuando los resumenes parciales no caben en la ventana. Con
-   3 paginas por bloque, 100 paginas producen ~34 resumenes, que no caben en 4K.
+   3 paginas por bloque, 100 paginas producen ~50 resumenes, que no caben en 4K.
 7. La **temperatura** es baja (0.1). El modelo debe extraer, no redactar.
 8. El analisis **no se puede pausar ni reanudar**. Si el Web Worker muere, el trabajo se
    abandona (HU-08).
@@ -194,7 +194,7 @@ bloques y el backend recibe 34, ambos coinciden.
    - si no valida, reintenta hasta 2 veces incorporando el error de validacion en el prompt,
    - si sigue fallando, se detiene con un error explicito,
    - reporta el avance.
-3. Al terminar, tiene 34 resumenes parciales.
+3. Al terminar, tiene 50 resumenes parciales.
 
 ### 7.4 Reduce
 
@@ -206,8 +206,8 @@ bloques y el backend recibe 34, ambos coinciden.
 
 ### 7.5 Enviar y persistir
 
-1. El frontend llama a `POST /api/v1/documentos` con el resumen ejecutivo, los riesgos y los
-   34 resumenes.
+1. El frontend llama a `POST /api/v1/documentos/{id}/analisis` con el resumen ejecutivo, los
+   riesgos y los resumenes por bloque.
 2. El backend valida **todo** contra el esquema de la plantilla:
    - si un resumen no cumple, se rechaza el conjunto entero (respuesta 422),
    - si el numero de bloques no coincide con el esperado, se rechaza,
@@ -216,6 +216,10 @@ bloques y el backend recibe 34, ambos coinciden.
    de Postgres por RPC).
 4. El backend marca el trabajo como completado.
 5. Responde 201 con el `documento_id` y el resumen ejecutivo.
+
+> El resultado **no** viaja en `POST /api/v1/documentos`. Ese endpoint registra el
+> documento y devuelve la URL de subida; el resultado llega despues, en su propio
+> endpoint. Ver `ARQUITECTURA.md` seccion 7.0 (ADR-29).
 
 ---
 
@@ -324,7 +328,7 @@ error
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-09: El progreso se reporta
-**Dado** un documento de 34 bloques
+**Dado** un documento de 50 bloques
 **Cuando** se procesa
 **Entonces** el cliente reporta avance en cada bloque, con el bloque actual y el total
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

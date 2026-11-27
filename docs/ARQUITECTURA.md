@@ -23,12 +23,13 @@ Verificadas contra los registros oficiales (PyPI, npm y nodejs.org) el **2026-11
 
 | Componente | Version | Publicada | Nota |
 |---|---|---|---|
-| Python | **3.15.2** | 2026-10-25 | Estable. El motor de inferencia corre en el navegador, no aqui |
+| Python | **3.14.10** | 2026-10-07 | **No 3.15.** Vercel Functions no ofrece 3.15 todavia (ver 1.0.1) |
 | FastAPI | **0.165.0** | 2026-11-18 | `requires_python >= 3.11`; declara `Python :: 3.15` |
 | supabase (SDK de Python) | **2.34.1** | 2026-11-06 | `requires_python >= 3.11` (dejo 3.9 y 3.10 en 2.34.0) |
 | Vue | **3.5.46** | 2026-11 | Rama 3.5, parche activo |
 | Vite | **8.4.0** | 2026-11-26 | Empaquetador **Rolldown** (`rolldown ~1.3.2`) |
-| TypeScript | **7.0.2** | 2026-07-08 | Port nativo (Go). La serie 5.9 sigue disponible si hace falta |
+| TypeScript | **6.0.3** | 2026-10 | **No 7.x.** TypeScript 7 no expone API programatica estable y rompe `vue-tsc` (ver 1.0.2) |
+| vue-tsc | **3.3.14** | 2026-10 | Verificacion de tipos de los `.vue`. Requiere TypeScript 6 |
 | Node.js | **24 o 26** (LTS) | - | El piso real lo impone `@supabase/supabase-js`: `>= 22.0.0` |
 | @supabase/supabase-js | **2.119.2** | 2026-11-19 | `engines.node >= 22.0.0` |
 | @mlc-ai/web-llm | **0.2.89** | 2026-11-17 | 175 modelos en el catalogo. Ver 6.2 |
@@ -37,8 +38,48 @@ Verificadas contra los registros oficiales (PyPI, npm y nodejs.org) el **2026-11
 | PostgREST | **14** | - | La Data API de Supabase |
 | Supabase (plan) | **Free** | - | Primer despliegue, ADR-21. Sube a Pro si el demo es un trabajo facturado |
 
+### 1.0.1 Por que Python 3.14 y no 3.15
+
+`[DECIDIDO]` **Python 3.14.10.** Vercel Functions ofrece **3.12 (por defecto), 3.13 y 3.14**.
+La version 3.15 todavia no esta disponible en el runtime de Vercel: fijar 3.15.2 en el
+`pyproject.toml` seria una promesa que el despliegue no puede cumplir, y el error
+apareceria en el primer `vercel deploy`, no en la revision.
+
+Python 3.15 no esta *prohibido*: es la version mas nueva y FastAPI ya la declara soportada.
+Simplemente **no se puede desplegar ahi todavia**. Si el cliente contrata un despliegue
+propio (Docker, ADR-21), ahi si se puede subir a 3.15. El pin del repositorio sigue el
+entorno de despliegue real, no el mas nuevo que exista.
+
+### 1.0.2 Por que TypeScript 6 y no 7
+
+`[DECIDIDO]` **TypeScript 6.0.3 con `vue-tsc` 3.3.14.** TypeScript 7 es el port nativo en
+Go y ya es `latest` en npm, pero **no expone la API programatica de JavaScript** que
+necesitan las herramientas del ecosistema:
+
+- `vue-tsc` la necesita para verificar los tipos de los `.vue` desde la linea de comandos.
+- `typescript-eslint` declara `>=4.8.4 <6.1.0` y **rechaza** 7.0.
+- Vue Language Tools tiene la misma dependencia.
+
+El proyecto usa componentes de archivo unico de Vue 3.5, asi que `vue-tsc` no es
+opcional: sin el, los `.vue` no se verifican.
+
+La combinacion que Microsoft publica para este caso es instalar las dos lineas con alias:
+
+```jsonc
+{
+  "devDependencies": {
+    "typescript": "npm:@typescript/typescript6@^6.0.2",   // API de JS: vue-tsc, eslint, tests
+    "@typescript/native": "npm:typescript@^7.0.2"          // compilador nativo: build y watch
+  }
+}
+```
+
+En la v1 se usa **solo TypeScript 6**: una dependencia mas, un `tsc` mas lento, y nada
+ganado. La linea 7 entra cuando el proyecto tenga volumen de build que lo justifique o
+cuando `vue-tsc` lo soporte de forma estable.
+
 **El SDK de Python va en 2.34.1, no en la ultima de la serie 2.** La 2.34.1 es la que
-declara `requires_python >= 3.11` y por tanto admite 3.15 sin problema.
+declara `requires_python >= 3.11` y por tanto admite 3.14 sin problema.
 
 **El CLI tiene dos ramas vivas.** `latest` es la v3 (3.4.0) y la v2 sigue viva bajo el
 dist-tag `v2.stable` (2.122.1). Se usa la **v3**; la v2 queda anotada por si una
@@ -66,40 +107,90 @@ Windows, y **Safari 26 en macOS Tahoe 26 / iOS 26** — no en macOS 15 ni anteri
 | Gestor de dependencias | `uv` | Recomendado por FastAPI; alternativa `pip` + venv |
 | Validacion y config | `pydantic` v2 + `pydantic-settings` | `pydantic-settings` para leer `.env` |
 | Acceso a datos | **Cliente HTTP de Supabase (PostgREST)** | Ver ADR-04. Sin `asyncpg` en el camino caliente |
-| Migraciones | `alembic` | Conexion directa a Postgres, solo en desarrollo |
+| Migraciones | **Supabase CLI** (`supabase/migrations/*.sql`) | Una sola fuente de verdad. Ver ADR-32 |
 | ETL de PDF (v2, servidor) | `pymupdf` (fitz), `docling` para OCR | Segun necesidad de OCR (DP-03) |
 | LLM en navegador | `@mlc-ai/web-llm` + `pdf.js` | Camino principal de la v1 |
 | LLM en servidor (v2) | `ollama` (cliente HTTP) o `vllm` | Solo para el modo servidor |
 | Cola de tareas | **Aplazada a la v2** | La v1 no encola: el analisis ocurre en el cliente |
 | Tests | `pytest`, `pytest-asyncio`, `httpx` | Tests de integracion contra Supabase real |
-| Calidad | `ruff` (lint + format), `mypy` (tipos estricto) | |
+| Calidad | `ruff` (lint + format), `mypy` (tipos estricto), `import-linter` | El ultimo verifica la frontera hexagonal sin esperar a un humano |
+| Tipos del cliente | `openapi-typescript` + `openapi-fetch` | Los tipos del frontend se generan del OpenAPI, no se escriben a mano |
 | Containers | `docker compose` | Entorno local reproducible + worker de la v2 |
 
 **El conjunto de dependencias del backend es deliberadamente ligero.** La inferencia ocurre
 en el navegador, asi que Python no carga con el peso de la IA: no hay `torch`, ni `numpy`
 con ruedas pesadas, ni servidor de modelos. El nucleo es `fastapi[standard]`, `pydantic`,
-`httpx` y el SDK de Supabase, mas `alembic` para migrar y `pytest` para probar. Una
-dependencia que no justifique su peso se rechaza en la revision.
+`httpx` y el SDK de Supabase, mas `pytest` para probar. **No hay Alembic**: las
+migraciones son SQL que aplica el CLI de Supabase (ADR-32). Una dependencia que no
+justifique su peso se rechaza en la revision.
+
+**La frontera hexagonal se verifica sola.** `import-linter` corre en la integracion
+continua desde el primer commit, con contratos explicitos:
+
+```toml
+# backend/pyproject.toml
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "El dominio no depende de nadie"
+type = "forbidden"
+source_modules = ["app.domain"]
+forbidden_modules = ["app.application", "app.adapters", "app.worker", "fastapi", "pydantic", "httpx", "supabase"]
+
+[[tool.importlinter.contracts]]
+name = "La aplicacion no conoce los adaptadores"
+type = "forbidden"
+source_modules = ["app.application"]
+forbidden_modules = ["app.adapters", "fastapi"]
+```
+
+Una dependencia prohibida rompe la integracion continua antes de que la rompa la
+reproduccion de la revision.
+
+**Los tipos del frontend se generan, no se escriben.** El backend expone su OpenAPI y el
+frontend lo consume:
+
+```
+npm run api:types    # lee backend/tests/contract/openapi.json y genera frontend/src/api/types.ts
+```
+
+El archivo generado se versiona, para que un cambio de contrato se vea en el diff y no
+aparezca solo en el momento de compilar.
 
 ### 1.3 Toolchain del frontend
 
 | Categoria | Eleccion | Nota |
 |---|---|---|
 | Framework | Vue 3.5.46 (`<script setup>`, Composition API) | |
-| Build | Vite 8.4.0 + TypeScript 7.0.2 | Empaquetador Rolldown |
+| Build | Vite 8.4.0 + TypeScript 6.0.3 | Empaquetador Rolldown. `vue-tsc` 3.3.14 para los `.vue` |
 | Estado | Pinia | Estado de sesion, configuracion del motor, documentos |
 | Enrutado | Vue Router | |
 | Estilos | Tailwind CSS | Coherente con la version original del documento |
 | Cliente HTTP | `fetch` tipado con interceptor de token | `fetch` nativo basta para el volumen esperado |
 | Cliente de datos | `@supabase/supabase-js` 2.119.2 | Requiere Node >= 22. Lo que habla con PostgREST |
-| ETL en navegador | `pdf.js` | Extraccion de texto por pagina |
+| ETL en navegador | `pdf.js` | Extraccion de texto por pagina. **Empaquetado localmente**, no desde un CDN: el modo sin conexion lo exige |
 | LLM en navegador | `@mlc-ai/web-llm` 0.2.89 | Ejecucion en Web Worker, **nunca** en el hilo principal |
 | Chunking | Funcion propia compartida con el backend | Mismo algoritmo en ambos lados |
+| Tests | `vitest` + `@vue/test-utils` | Con adaptadores de prueba para `WebGPU`, `WebWorker` y `Cache API` |
 
 **El motor LLM vive en un Web Worker.** Cargar 1.5 a 3 GB de pesos y luego generar token a
 token en el hilo principal bloquearia la interfaz: la app dejaria de responder mientras se
 analiza, que es justo el requisito de que la aplicacion no se afecte. Vite 8 empaqueta los
 modulos de WebAssembly de forma nativa, asi que el worker se importa sin rodeos.
+
+**El troceado se prueba con casos dorados compartidos.** Python y TypeScript no pueden
+importar el mismo archivo de codigo, asi que el algoritmo vive en los dos lados y se
+verifica con el **mismo conjunto de datos**:
+
+```
+shared/chunking-casos.json
+```
+
+El archivo tiene entradas y salidas esperadas. `pytest` las corre en Python y `vitest` las
+corre en TypeScript. Si los dos lados divergen, uno de los dos falla: es exactamente el
+error que un documento con datos contradictorios entre bloques produce, y que en el
+navegador seria muy dificil de diagnosticar.
 
 ---
 
@@ -209,11 +300,8 @@ Risk-app/
 ├── backend/
 │   ├── pyproject.toml
 │   ├── Dockerfile                # entorno local y futuro despliegue self-hosted
-│   ├── alembic.ini
-│   ├── alembic/versions/
 │   ├── api/index.py              # handler de Vercel (@vercel/python) que expone `app`
-│   ├── app/
-│   │   ├── main.py               # composicion: app FastAPI + routers + handlers
+│   ├── app/│   │   ├── main.py               # composicion: app FastAPI + routers + handlers
 │   │   ├── config.py             # pydantic-settings; falla al arrancar si falta config
 │   │   ├── domain/               # SIN dependencias de framework ni de infra
 │   │   │   ├── entities/         #   documento.py, bloque.py, analisis.py, plantilla.py
@@ -243,6 +331,17 @@ Risk-app/
 │       ├── unit/                 #   dominio y casos de uso, sin DB ni red
 │       ├── integration/          #   contra Supabase real
 │       └── contract/             #   OpenAPI snapshot + envelope
+├── supabase/                     #   configuracion y migraciones (ADR-32)
+│   ├── config.toml
+│   ├── migrations/               #   *.sql, la unica fuente de verdad del esquema
+│   │   ├── 001_esquema_inicial.sql
+│   │   ├── 002_rls.sql
+│   │   ├── 003_permisos_y_roles.sql
+│   │   ├── 004_bucket_y_storage.sql
+│   │   └── 005_funciones_rpc.sql
+│   └── seed.sql                  #   datos semilla: roles, permisos, plantilla v1
+├── shared/                       #   fixtures compartidas entre Python y TypeScript
+│   └── chunking-casos.json       #   casos dorados del troceado (ver §5.4)
 └── frontend/
     ├── package.json
     ├── vite.config.ts
@@ -304,8 +403,9 @@ equipo), `Rol`, `Permiso` y `RolPermiso` (matriz de permisos granular).
 
 ## 5. Modelo de datos
 
-`[DECIDIDO]` PostgreSQL en Supabase. Migraciones con Alembic. El esquema nunca se edita a
-mano: cada cambio es una migracion nueva.
+`[DECIDIDO]` PostgreSQL en Supabase. **Migraciones con el CLI de Supabase** (SQL puro en
+`supabase/migrations/`). El esquema nunca se edita a mano: cada cambio es una migracion
+nueva. Ver ADR-32.
 
 ### 5.1 Tablas
 
@@ -314,22 +414,72 @@ mano: cada cambio es una migracion nueva.
 create table organizaciones (
   id          uuid primary key default gen_random_uuid(),
   nombre      text not null,
-  created_at  timestamptz not null default now()
+  creado_en   timestamptz not null default now()
+);
+
+-- Roles y permisos granulares. La matriz vive en datos, no en codigo: agregar un permiso
+-- no requiere desplegar. Se definen antes que `perfiles` porque se referencian.
+create table roles (
+  clave       text primary key,   -- admin | analista | auditor
+  nombre      text not null,
+  descripcion text,
+  -- True = el rol viene con el sistema y no se puede eliminar ni renombrar.
+  is_system   boolean not null default false,
+  creado_en   timestamptz not null default now()
+);
+
+create table permisos (
+  clave       text primary key,   -- documentos.ver | documentos.analizar | ...
+  nombre      text not null,
+  descripcion text not null,
+  creado_en   timestamptz not null default now()
+);
+
+create table rol_permisos (
+  rol     text not null references roles(clave) on delete cascade,
+  permiso text not null references permisos(clave) on delete cascade,
+  primary key (rol, permiso)
 );
 
 -- Perfil del usuario. Extiende auth.users (Supabase Auth).
 create table perfiles (
   id                        uuid primary key references auth.users(id) on delete cascade,
   organizacion_id           uuid references organizaciones(id),
-  rol                       text not null default 'analista',  -- admin | analista | auditor
+  rol                       text not null default 'analista' references roles(clave),
   nombres                   text not null,
   apellido_1                text not null,
   apellido_2                text,
   display_name              text,
+  -- Correo del usuario. Se copia desde `auth.users` al crear la cuenta, para que el
+  -- listado de usuarios no tenga que leer `auth.users` con `service_role` en cada
+  -- peticion. `auth.users` sigue siendo la fuente de verdad; esta es una copia.
+  correo                    text not null,
   -- True mientras la credencial sigue siendo la autogenerada y enviada por correo.
   -- Se limpia en el primer inicio de sesion con cambio de contrasena.
   debe_cambiar_contrasena    boolean not null default false,
-  created_at                timestamptz not null default now()
+  -- False = el usuario esta desactivado: no puede iniciar sesion y el resolutor de
+  -- permisos lo trata como sin permisos, sin consultar `auth.users` en cada peticion.
+  activo                    boolean not null default true,
+  creado_en                 timestamptz not null default now(),
+  eliminado_en              timestamptz
+);
+
+-- Pertenencia a una organizacion con un rol propio por equipo.
+create table organizaciones_miembros (
+  organizacion_id uuid not null references organizaciones(id) on delete cascade,
+  usuario_id      uuid not null references auth.users(id) on delete cascade,
+  rol             text not null references roles(clave),
+  creado_en       timestamptz not null default now(),
+  primary key (organizacion_id, usuario_id)
+);
+
+-- Sesiones revocadas. El cierre de sesion invalida el token de inmediato (ADR-31).
+-- Solo guarda el session_id, nunca el token. Las filas caducan con el token.
+create table sesiones_revocadas (
+  session_id   text primary key,
+  usuario_id   uuid references auth.users(id) on delete cascade,
+  revocado_en  timestamptz not null default now(),
+  expira_en    timestamptz not null
 );
 
 -- Plantillas de extraccion: campos dinamicos sin migrar la BD.
@@ -341,7 +491,8 @@ create table plantillas_extraccion (
   esquema          jsonb not null,   -- {"campos":[{"clave","tipo","descripcion","obligatorio"}]}
   instruccion      text not null,
   activa           boolean not null default true,
-  created_at       timestamptz not null default now()
+  creado_en        timestamptz not null default now(),
+  eliminado_en     timestamptz
 );
 
 -- Configuracion del motor IA, por usuario o por organizacion.
@@ -356,7 +507,8 @@ create table configuracion_motor (
   overlap_paginas       int  not null default 1,
   ventana_contexto      int  not null default 4096,
   temperatura           numeric(3,2) not null default 0.10,
-  updated_at            timestamptz not null default now(),
+  actualizado_en        timestamptz not null default now(),
+  eliminado_en          timestamptz,
   -- exactamente un ambito por fila
   constraint configuracion_motor_ambito_unico check (
     (ambito = 'usuario'     and usuario_id is not null and organizacion_id is null) or
@@ -373,16 +525,29 @@ create table documentos (
   hash_sha256       text not null,
   -- Ruta del objeto en el almacenamiento privado. Nulo mientras no se ha subido.
   ruta_archivo      text,
+  tamano_bytes      bigint not null default 0,
+  tipo_mime         text not null default 'application/pdf',
   total_paginas     int,
   modo_procesamiento text not null,   -- navegador_local | servidor_python
   estado            text not null default 'en_proceso',  -- en_proceso | completado | error
   error_mensaje     text,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
+  -- Momento en que el archivo quedo archivado en el bucket privado. Nulo si nunca se subio.
+  archivado_en      timestamptz,
+  creado_en         timestamptz not null default now(),
+  actualizado_en    timestamptz not null default now(),
   eliminado_en      timestamptz
 );
 
--- Bloque analizado (fase Map).
+-- Documentos compartidos con otro usuario de la misma organizacion.
+create table documentos_compartidos (
+  documento_id   uuid not null references documentos(id) on delete cascade,
+  usuario_id     uuid not null references auth.users(id) on delete cascade,
+  compartido_por uuid references auth.users(id) on delete set null,
+  creado_en      timestamptz not null default now(),
+  primary key (documento_id, usuario_id)
+);
+
+-- Bloque analizado (fase Map). Vive en cascada con el documento: no tiene borrado logico.
 create table bloques (
   id                  uuid primary key default gen_random_uuid(),
   documento_id        uuid not null references documentos(id) on delete cascade,
@@ -392,21 +557,25 @@ create table bloques (
   pagina_fin          int  not null,
   resumen             text,
   datos_estructurados jsonb not null,
-  created_at          timestamptz not null default now(),
+  creado_en           timestamptz not null default now(),
   unique (documento_id, indice)
 );
 
--- Analisis consolidado (fase Reduce).
+-- Analisis consolidado (fase Reduce). Un analisis vigente por documento.
 create table analisis_documentos (
   id                uuid primary key default gen_random_uuid(),
   documento_id      uuid not null unique references documentos(id) on delete cascade,
   usuario_id        uuid not null references auth.users(id) on delete cascade,
   plantilla_id      uuid references plantillas_extraccion(id),
   plantilla_version int,
+  -- Modelo que produjo este analisis. Se compara con el del reanálisis para explicar
+  -- diferencias que no vienen de la plantilla (HU-10 EC-05).
+  modelo            text,
+  total_bloques     int,
   resumen_ejecutivo text,
   riesgos           jsonb,
   resumenes         jsonb not null default '[]'::jsonb,  -- un resumen por bloque
-  created_at        timestamptz not null default now()
+  creado_en         timestamptz not null default now()
 );
 
 -- Historial de analisis: cuando un documento se reanaliza con otra plantilla, el
@@ -423,35 +592,7 @@ create table analisis_historial (
   resumenes         jsonb,
   -- Id del analisis vigente que sustituyo a este.
   reemplazado_por   uuid references analisis_documentos(id),
-  created_at        timestamptz not null default now()
-);
-
--- Roles y permisos granulares. La matriz vive en datos, no en codigo: agregar un permiso
--- no requiere desplegar.
-create table roles (
-  clave       text primary key,   -- admin | analista | auditor
-  nombre      text not null,
-  descripcion text
-);
-
-create table permisos (
-  clave       text primary key,   -- documentos.ver | documentos.analizar | ...
-  descripcion text not null
-);
-
-create table rol_permisos (
-  rol     text not null references roles(clave) on delete cascade,
-  permiso text not null references permisos(clave) on delete cascade,
-  primary key (rol, permiso)
-);
-
--- Pertenencia a una organizacion con un rol propio por equipo.
-create table organizaciones_miembros (
-  organizacion_id uuid not null references organizaciones(id) on delete cascade,
-  usuario_id      uuid not null references auth.users(id) on delete cascade,
-  rol             text not null,
-  created_at      timestamptz not null default now(),
-  primary key (organizacion_id, usuario_id)
+  creado_en         timestamptz not null default now()
 );
 
 -- Seguimiento de un analisis en curso.
@@ -463,68 +604,155 @@ create table trabajos (
   estado          text not null default 'en_cola',
                   -- en_cola | en_proceso | completado | error | cancelado | interrumpido
   progreso        int  not null default 0 check (progreso between 0 and 100),
-  paso_actual     text,      -- 'extrayendo' | 'analizando bloque 7 de 34' | 'reduciendo'
+  paso_actual     text,      -- 'extrayendo' | 'analizando bloque 7 de 50' | 'reduciendo'
   modo            text not null,  -- navegador_local | servidor_python
   iniciado_en     timestamptz,
   finalizado_en   timestamptz,
   duracion_ms     bigint,
+  -- Ultimo latido recibido. `created_at` no sirve: los reportes posteriores no lo actualizan.
+  -- Es lo que permite detectar un trabajo abandonado (ADR-24).
+  ultimo_latido_en timestamptz,
   error_mensaje   text,
-  created_at      timestamptz not null default now()
+  creado_en       timestamptz not null default now(),
+  eliminado_en    timestamptz
 );
 
 -- Bitacora de pasos ejecutados (visible en la UI).
 create table trabajo_actividades (
   id            uuid primary key default gen_random_uuid(),
   trabajo_id    uuid not null references trabajos(id) on delete cascade,
+  -- Clave de idempotencia que envia el cliente. Un reintento de red con el mismo
+  -- `id_reporte` no duplica filas (HU-08 CE-06).
+  id_reporte    text not null,
   tipo          text not null,   -- extraccion | bloque | reduce | persistencia
   mensaje       text,
   pagina_inicio int,
   pagina_fin    int,
   duracion_ms   int,
-  created_at    timestamptz not null default now()
+  creado_en     timestamptz not null default now(),
+  unique (trabajo_id, id_reporte)
 );
+
+-- Bitacora de auditoria. Quien hizo que, cuando y desde donde.
+create table auditoria (
+  id            uuid primary key default gen_random_uuid(),
+  organizacion_id uuid references organizaciones(id),
+  usuario_id    uuid references auth.users(id) on delete set null,
+  actor         text not null,          -- correo o identificador del actor
+  accion        text not null,          -- usuario.creado | documento.eliminado | ...
+  entidad       text not null,          -- usuario | documento | plantilla | ...
+  entidad_id    uuid,
+  detalles      jsonb,
+  ip            inet,
+  user_agent    text,
+  creado_en     timestamptz not null default now()
+);
+
+-- Indices
+create index documentos_org_idx        on documentos (organizacion_id, creado_en desc);
+create index documentos_usuario_idx    on documentos (usuario_id, creado_en desc);
+create index bloques_documento_idx     on bloques (documento_id, indice);
+create index analisis_documento_idx    on analisis_documentos (documento_id);
+create index historial_documento_idx   on analisis_historial (documento_id, creado_en desc);
+create index trabajos_documento_idx    on trabajos (documento_id);
+-- Soporta la expiracion perezosa: buscar los trabajos activos sin latido reciente.
+create index trabajos_latido_idx       on trabajos (estado, ultimo_latido_en);
+create index trabajo_actividades_idx   on trabajo_actividades (trabajo_id, creado_en);
+create index auditoria_org_idx         on auditoria (organizacion_id, creado_en desc);
+-- Un documento con el mismo contenido no se vuelve a subir mientras siga vivo.
+create unique index documentos_hash_unico
+  on documentos (usuario_id, hash_sha256) where eliminado_en is null;
 ```
 
 > **Nota sobre `tamano_chunk_paginas`.** El valor por defecto cambio de 10 a 3. Ver seccion
 > 6.2: los modelos de WebLLM vienen con ventana de contexto de 4K tokens, y 10 paginas de
 > texto denso la desbordan.
 
+> **Idioma de las columnas de tiempo.** Todas usan `creado_en`, `actualizado_en` y
+> `eliminado_en`, en espanol, sin excepcion. Antes se mezclaban `created_at` y
+> `actualizado_en` en el mismo esquema, y esa mezcla habia llegado hasta los DTO del
+> `SKILL.md`. Como el esquema todavia no existe en ninguna base, se unifica ahora y no
+> despues: cambiar el nombre de una columna despues es una migracion, no un rename.
+
+> **Que tablas tienen borrado logico.** Las que el usuario puede listar y citar por su
+> cuenta: `perfiles`, `documentos`, `plantillas_extraccion`, `configuracion_motor` y
+> `trabajos`. Las hijas (`bloques`, `analisis_documentos`, `analisis_historial`,
+> `trabajo_actividades`, `documentos_compartidos`) se van en cascada con su padre: un
+> bloque sin documento no tiene sentido y conservarlo no aporta nada.
+
 ### 5.2 RLS
 
-`[DECIDIDO]` RLS activo en toda tabla con datos de usuario. Patron por organizacion:
+`[DECIDIDO]` RLS activo en toda tabla con datos de usuario.
+
+**El aislamiento de organizacion se resuelve desde `organizaciones_miembros`, no desde
+`perfiles.organizacion_id`.** El motivo es concreto: `perfiles` tiene un solo
+`organizacion_id`, pero un usuario puede pertenecer a varios equipos (PP-01). Si la politica
+se apoyara en `perfiles`, el usuario de una segunda organizacion veria todo lo de la
+primera. Y si se apoyara solo en `perfiles`, un `analista` sin `analisis.ver_todos` podria
+leer por PostgREST, con su propio JWT, los documentos de otros analistas de su equipo: la
+matriz de permisos se esquivaria por la puerta de atras.
 
 ```sql
+-- Funcion estable: la organizacion activa del usuario en la peticion.
+create or replace function organizacion_activa()
+returns uuid
+language sql stable
+as $$
+  select m.organizacion_id
+  from organizaciones_miembros m
+  join perfiles p on p.id = m.usuario_id
+  where m.usuario_id = auth.uid()
+    and p.activo
+    and p.eliminado_en is null
+  limit 1;
+$$;
+
 alter table documentos enable row level security;
 
+-- Lectura: lo propio, lo compartido, y lo de la organizacion si el permiso lo autoriza.
 create policy documentos_lectura on documentos
   for select using (
-    organizacion_id = (
-      select p.organizacion_id from perfiles p where p.id = auth.uid()
+    eliminado_en is null
+    and (
+      usuario_id = auth.uid()
+      or exists (
+        select 1 from documentos_compartidos dc
+        where dc.documento_id = documentos.id and dc.usuario_id = auth.uid()
+      )
+      or (
+        organizacion_id = organizacion_activa()
+        and public.usuario_tiene_permiso('analisis.ver_todos')
+      )
     )
   );
 ```
+
+**Dos capas, y por que son distintas.** RLS filtra **filas**: que documentos existen y son
+visibles. El permiso filtra **acciones**: que se puede hacer con ellos. Las dos se
+comprueban. RLS no puede implementar la matriz de permisos por si sola, y la matriz no
+puede saber que filas existen en otra organizacion.
+
+El caso de uso comprueba el permiso **antes** de consultar (ADR-30), asi que RLS no
+necesita responder "403": si el permiso falta, el caso de uso no llega a consultar; si
+falta el permiso de fila, RLS devuelve cero filas y eso es un 404.
 
 Reglas:
 
 - El backend **no** usa la `service_role` key para atender peticiones de usuario final: si la
   usa, RLS queda anulada y el aislamiento depende solo del codigo de aplicacion. Ver DP-05.
-- El rol `admin` ve su organizacion completa; `analista` ve lo de su organizacion segun la
-  politica de comparticion; `auditor` ve todo en modo lectura. `[PROPUESTO]` la matriz exacta
-  depende de DP-04.
 - Las claves de servicio se usan unicamente en el worker, y aun ahi la consulta se acota
   explicitamente por `usuario_id` u `organizacion_id`.
+- Toda tabla con datos de usuario tiene RLS activo, **incluidas** `auditoria`,
+  `documentos_compartidos` y `sesiones_revocadas`.
 
 ### 5.3 Indices
 
+Los indices se crean junto con las tablas, en el mismo bloque de la seccion 5.1. Se
+listan alli para que el DDL completo se lea en un solo sitio.
+
 ```sql
-create index documentos_usuario_idx     on documentos (usuario_id, created_at desc);
-create index documentos_org_idx        on documentos (organizacion_id, created_at desc);
-create index documentos_hash_idx        on documentos (hash_sha256) where eliminado_en is null;
 create index documentos_estado_idx      on documentos (estado) where estado = 'en_proceso';
-create index bloques_documento_idx     on bloques (documento_id, indice);
 create index bloques_riesgos_gin        on bloques using gin (datos_estructurados);
-create index analisis_documento_idx     on analisis_documentos (documento_id);
-create index historial_documento_idx   on analisis_historial (documento_id, created_at desc);
 create index plantillas_org_idx         on plantillas_extraccion (organizacion_id, activa);
 create index miembros_usuario_idx       on organizaciones_miembros (usuario_id);
 create index trabajos_usuario_idx       on trabajos (usuario_id, created_at desc);
@@ -558,7 +786,6 @@ inicio de sesion.
 | `documentos.compartir` | Compartir un documento con su organizacion |
 | `archivos.descargar` | Descargar el archivo original mediante URL firmada |
 | `archivos.eliminar` | Eliminar el archivo del almacenamiento |
-| `documentos.compartir` | Compartir un documento con su organizacion |
 | `analisis.ver_todos` | Ver analisis de otros usuarios de la organizacion |
 | `plantillas.ver` / `plantillas.editar` | Ver y modificar plantillas de extraccion |
 | `configuracion.ver` / `configuracion.editar` | Ver y modificar la configuracion del motor |
@@ -581,7 +808,9 @@ que la misma aplicacion tenga organizaciones con politicas distintas sin tocar c
 | `archivos.descargar` | si | el propio | si (lectura) |
 | `archivos.eliminar` | si | el propio | no |
 | `analisis.ver_todos` | si | **no** (por defecto) | si (lectura) |
+| `plantillas.ver` | si | si | si (lectura) |
 | `plantillas.editar` | si | no | no |
+| `configuracion.ver` | si | si | si (lectura) |
 | `configuracion.editar` | si | si (propia) | no |
 | `usuarios.gestionar` | si | no | no |
 | `organizacion.gestionar` | si | no | no |
@@ -597,13 +826,21 @@ cambiar codigo.
 - El permiso se comprueba **en el caso de uso**, no solo en el router. Un router que
   consulta el permiso y el caso de uso que lo vuelve a comprobar es redundante; un router
   que lo consulta y el caso de uso que no, es un agujero.
-- La comprobacion de permiso produce **403**, no 404, cuando el recurso existe pero el
-  usuario no tiene permiso sobre el. Producir 404 para un recurso forbidden oculta la
-  diferencia entre "no existe" y "no es tuyo".
+- **La respuesta sigue un orden fijo** (ADR-30): primero el permiso, despues la fila.
+  - Si el usuario **no tiene el permiso** que la accion exige: **403**.
+  - Si lo tiene, pero la fila no aparece (no existe, o es de otra organizacion y RLS la
+    filtro): **404**.
+
+  Asi el caso de uso no necesita `service_role` para distinguir "no existe" de "no lo puedes
+  ver": si el permiso falta, se responde 403 sin consultar; si el permiso esta, la consulta
+  con el JWT del usuario ya aplico RLS, y lo que no aparece se responde 404.
+- Un **403** es honesto cuando el usuario ya sabe que el recurso existe, porque esta en su
+  propia organizacion. Un **404** evita confirmar que un identificador de otra organizacion
+  existe.
 - La pertenencia a la organizacion se resuelve desde `organizaciones_miembros`, de modo que
   un usuario puede estar en mas de un equipo con un rol distinto en cada uno.
 - RLS y los permisos son capas complementarias, no redundantes: **RLS filtra filas**, el
-  **permiso filra acciones**. Un permiso ausente debe ser denegado, no "permitido por
+  **permiso filtra acciones**. Un permiso ausente debe ser denegado, no "permitido por
   defecto".
 
 ### 5.6 Creacion de usuarios
@@ -614,6 +851,22 @@ por el usuario `admin`.
 **Datos que captura el admin:** nombres, apellido 1, apellido 2, correo, y una
 **contrasena autogenerada** que se envia al correo del usuario, seguida de la confirmacion de
 la cuenta.
+
+**El primer administrador no se crea con SQL.** Insertar el primer usuario `admin` con un
+`insert` en `auth.users` es fragil: Supabase espera filas coordinadas en `auth.users` y
+`auth.identities`, con el formato interno de GoTrue, y ese formato cambia entre versiones.
+Lo que hace el proyecto es un **script de bootstrap idempotente** que usa la API de
+administracion de Supabase (`service_role`) despues de aplicar las migraciones:
+
+```
+uv run python -m scripts.bootstrap_admin --correo admin@ejemplo.com --organizacion "<nombre>"
+```
+
+El script es idempotente: si el correo ya existe, actualiza el perfil y no crea un
+duplicado. Se ejecuta **una vez**, despues de `supabase db push` y antes de que la
+aplicacion se use. Es el unico lugar del proyecto que usa `service_role` para crear
+usuarios por consola, y esta justificado porque no hay todavia ningun `admin` que pueda
+hacerlo desde la interfaz.
 
 **Flujo.**
 
@@ -719,13 +972,17 @@ values (
 
 -- Policies sobre storage.objects: controlan toda operacion de archivo,
 -- incluida la creacion de URLs firmadas.
+-- La ruta es {organizacion_id}/{usuario_id}/{documento_id}.pdf, asi que se comprueban
+-- LOS DOS primeros segmentos: validar solo el primero permitiria a un usuario escribir
+-- dentro de la carpeta de otro usuario de su misma organizacion.
 create policy archivos_insertar on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'documentos'
-    and (storage.foldername(name))[1] = (
-      select p.organizacion_id::text from perfiles p where p.id = auth.uid()
-    )
+    and (storage.foldername(name))[1] = organizacion_activa()::text
+    and (storage.foldername(name))[2] = auth.uid()::text
+    and (storage.foldername(name))[3] is not null
+    and lower(right(name, 4)) = '.pdf'
   );
 
 create policy archivos_leer on storage.objects
@@ -733,13 +990,27 @@ create policy archivos_leer on storage.objects
   using (
     bucket_id = 'documentos'
     and (
-      (storage.foldername(name))[1] = (
-        select p.organizacion_id::text from perfiles p where p.id = auth.uid()
-      )
+      (storage.foldername(name))[1] = organizacion_activa()::text
       or exists (
         select 1 from documentos d
-        where d.ruta_archivo = name and d.usuario_id = auth.uid()
+        where d.ruta_archivo = name
+          and d.usuario_id = auth.uid()
+          and d.eliminado_en is null
       )
+    )
+  );
+
+-- El borrado del archivo se autoriza por la misma regla que la lectura. Sin esta
+-- politica, un usuario no podria borrar su propio archivo, que es lo que exige RF-25.
+create policy archivos_borrar on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'documentos'
+    and exists (
+      select 1 from documentos d
+      where d.ruta_archivo = name
+        and d.usuario_id = auth.uid()
+        and d.eliminado_en is null
     )
   );
 ```
@@ -838,7 +1109,7 @@ contexto del modelo activo.
 
 | Motor | Ventana | Paginas por bloque (aprox.) | Reduce jerarquico |
 |---|---|---|---|
-| Modelos de navegador (WebLLM) | 4.096 | 3 | Necesario: 100 paginas producen ~34 resumenes |
+| Modelos de navegador (WebLLM) | 4.096 | 3 | Necesario: 100 paginas producen ~50 resumenes |
 | Modelo pequeno en servidor | 8.192 | 8 | Necesario |
 | Proveedor hospedado con ventana grande | 200.000 | ~200 (el documento entero) | Innecesario: cabe en una sola pasada |
 
@@ -849,8 +1120,8 @@ ventana grande, sin cambiar codigo.
 Consecuencias que se deducen del camino:
 
 - **El solapamiento tambien consume ventana.** `overlap_paginas` se resta antes de dividir.
-- **El Reduce puede desbordarse.** Con 100 paginas y bloques de 3, salen ~34 resumenes
-  parciales. A 200 tokens cada uno son ~6.800 tokens: no cabe en 4K. El Reduce debe ser
+- **El Reduce puede desbordarse.** Con 100 paginas y bloques de 3, salen ~50 resumenes
+  parciales. A 200 tokens cada uno son ~10.000 tokens: no cabe en 4K. El Reduce debe ser
   **jerarquico**: se agrupan los resumenes en lotes que quepan y se reduce cada lote, y
   luego se reducen los resultados intermedios. Para documentos de hasta ~200 paginas cabe
   en dos niveles.
@@ -939,6 +1210,8 @@ Eso baja el costo de operacion a casi cero y hace que todo quepa en Vercel + Sup
 - El frontend sube el PDF al endpoint de subida, que responde `202`.
 - El worker (Docker) ejecuta ETL con PyMuPDF y LLM con Ollama o vLLM.
 - El pipeline se mantiene el mismo; solo cambian los adaptadores de ETL y de LLM.
+- La cola del servidor (`pgmq`) entra, y el worker corre en un contenedor.
+- El contrato de `trabajo` **no cambia**: mismo progreso, misma bitacora, mismos estados.
 
 El caso de uso es el mismo. Esa es exactamente la prueba de que la decision hexagonal era
 la correcta.
@@ -966,7 +1239,7 @@ cambia.
 
 - `progreso` es un entero de 0 a 100 y **nunca disminuye**. Escriba quien lo escriba.
 - `progreso` se calcula por fraccion de trabajo conocido, no por tiempo transcurrido: con 34
-  bloques, cada bloque vale ~2.9 puntos. Proyectar por tiempo miente cuando un bloque es
+  bloques, cada bloque vale ~1.7 puntos. Proyectar por tiempo miente cuando un bloque es
   mas lento que otros.
 - `paso_actual` es texto para humanos: "analizando bloque 7 de 34". No es un estado de
   maquina: es la ultima cosa que el usuario quiere leer.
@@ -1008,12 +1281,17 @@ trabajo se queda en `en_proceso` para siempre. Se resuelve con dos mecanismos:
 
 - El cliente envia un **latido** con cada reporte de progreso. Un trabajo sin latido por mas
   de N minutos se considera abandonado.
-- Una tarea de mantenimiento (un `cron` de Vercel, o el mismo endpoint de salud con un
-  disparador) marca los trabajos sin latido como `interrumpido`, liberando el documento para
-  poder reintentarse.
+- La **expiracion perezosa** marca los trabajos sin latido como `interrumpido` cuando
+  alguien los mira (ADR-24). No hay un proceso que vaya a buscarlos.
 
 Sin esto, un analisis abandonado deja el documento en un limbo que el usuario ve como "en
 proceso" para siempre.
+
+**Por que no hay un `cron`.** En Vercel Hobby los Cron Jobs corren **una vez al dia**, y
+una expresion mas frecuente **falla el despliegue**. Una tarea cada 2 minutos no es
+configurable en el plan que usa el primer despliegue (ADR-21). La expiracion perezosa
+resuelve el mismo problema sin depender del plan: el trabajo se limpia la primera vez que
+alguien lo mira, que es justo cuando importa.
 
 **Cola en el servidor: para el futuro, no para la v1.** `[PROPUESTO]` Si se anade un modo
 hospedado, la cola entra como `pgmq` dentro de Postgres: el mensaje lleva `trabajo_id` y
@@ -1030,18 +1308,6 @@ trabajo ya la contempla, pero **la v1 no la necesita y no debe construirla**.
 **Actualizacion en la UI.** `[DECIDIDO]` Polling al endpoint de trabajo. Es suficiente para
 este volumen y no obliga a mantener conexiones abiertas, lo que es una restriccion real en
 plataformas de funciones. Si mas adelante hace falta, el mismo endpoint sirve para SSE.
-
-### 6.9 El modo hospedado, cuando exista
-
-`[PROPUESTO]` Hoy no aplica: DP-11 cerro en **solo navegador**. Si manana se anade un modo
-hospedado (por ejemplo, para quien no tenga WebGPU), el cambio es:
-
-- El cliente sube el PDF en vez de extraerlo.
-- El worker extrae, divide, ejecuta el LLM y persiste.
-- El contrato de `trabajo` **no cambia**: mismo progreso, misma bitacora, mismos estados.
-- La cola del servidor (`pgmq`) entra, y el worker corre en un contenedor.
-
-Que el contrato no cambie es la prueba de que la decision hexagonal fue la correcta.
 
 ### 6.8 El artefacto JSON y el DTO de salida
 
@@ -1112,31 +1378,79 @@ cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la 
 | Metodo | Ruta | Descripcion | Auth |
 |---|---|---|---|
 | GET | `/health` | Sonda de vida y estado de la base | No |
-| POST | `/api/v1/auth/login` | Inicio de sesion (delega en Supabase Auth) | No |
-| POST | `/api/v1/auth/logout` | Cierre de sesion | Si |
-| GET | `/api/v1/auth/me` | Usuario, rol y organizacion actuales | Si |
+| POST | `/api/v1/auth/logout` | Cierra la sesion y revoca el `session_id` de inmediato | Si |
+| POST | `/api/v1/auth/cambiar-contrasena` | Confirma el cambio de la credencial temporal y limpia la bandera | Si |
+| GET | `/api/v1/auth/me` | Usuario, rol, organizacion y permisos efectivos | Si |
 | GET | `/api/v1/configuracion/motor` | Configuracion efectiva del motor | Si |
 | PUT | `/api/v1/configuracion/motor` | Guarda configuracion (usuario u organizacion) | Si |
+| DELETE | `/api/v1/configuracion/motor` | Borra la configuracion personal y vuelve a la de la organizacion | Si |
 | GET | `/api/v1/plantillas` | Lista plantillas de extraccion activas | Si |
-| POST | `/api/v1/plantillas` | Crea plantilla (admin) | Si |
+| POST | `/api/v1/plantillas` | Crea plantilla (admin) | Si, `plantillas.editar` |
+| GET | `/api/v1/plantillas/{id}` | Detalle de una plantilla y sus versiones | Si |
+| PUT | `/api/v1/plantillas/{id}` | Edita la plantilla creando una version nueva | Si, `plantillas.editar` |
 | GET | `/api/v1/documentos` | Lista paginada con filtro por estado y ambito | Si |
-| POST | `/api/v1/documentos` | Registra el resultado de un analisis (v1) | Si |
+| POST | `/api/v1/documentos` | Registra el documento y devuelve la URL de subida firmada | Si, `documentos.analizar` |
 | POST | `/api/v1/documentos/subir` | Sube el PDF para analisis en servidor (v2) | Si |
 | GET | `/api/v1/documentos/{id}` | Detalle, estado y analisis | Si |
 | GET | `/api/v1/documentos/{id}/bloques` | Bloques con sus datos estructurados | Si |
-| DELETE | `/api/v1/documentos/{id}` | Soft delete | Si |
+| GET | `/api/v1/documentos/{id}/historial` | Analisis anteriores del documento (tras un reanálisis) | Si |
+| DELETE | `/api/v1/documentos/{id}` | Soft delete y borrado del archivo archivado | Si, dueno o admin |
 | GET | `/api/v1/documentos/{id}/analisis` | Analisis completo (DTO de salida) | Si |
+| POST | `/api/v1/documentos/{id}/analisis` | Registra el resultado del analisis y lo persiste | Si (dueno) |
 | POST | `/api/v1/documentos/{id}/archivo` | Confirma la subida y guarda la ruta | Si, dueno |
 | GET | `/api/v1/documentos/{id}/descarga` | URL firmada de descarga (1 h) | Si, `documentos.ver` |
 | POST | `/api/v1/documentos/{id}/reanalisis` | Reanaliza un documento archivado con la plantilla vigente | Si, `documentos.analizar` |
 | GET | `/api/v1/trabajos/{id}` | Progreso, paso actual, duracion y actividades | Si |
 | POST | `/api/v1/trabajos` | Abre un trabajo para un documento (el cliente lo reporta) | Si |
 | POST | `/api/v1/trabajos/{id}/progreso` | El cliente reporta progreso y actividades | Si (dueno) |
+| POST | `/api/v1/trabajos/{id}/cancelar` | Cancela un trabajo en curso y libera el documento | Si (dueno) |
 | GET | `/api/v1/trabajos` | Listado de trabajos del usuario | Si |
 | GET | `/api/v1/usuarios` | Listado de usuarios de la organizacion | Si, admin |
 | POST | `/api/v1/usuarios` | Crea un usuario, le asigna rol y envia la credencial temporal | Si, admin |
 | PATCH | `/api/v1/usuarios/{id}` | Cambia rol, organizacion o estado | Si, admin |
-| GET | `/api/v1/roles` | Catalogo de roles y sus permisos | Si |
+| POST | `/api/v1/usuarios/{id}/reenviar-credencial` | Genera una credencial temporal nueva y la reenvia por correo | Si, admin |
+| GET | `/api/v1/roles` | Catalogo de roles y sus permisos | Si, `organizacion.gestionar` |
+| GET | `/api/v1/auditoria` | Bitacora de auditoria de la organizacion, paginada | Si, `auditoria.ver` |
+
+**Por que `GET /api/v1/auth/me` devuelve los permisos efectivos.** La UI los necesita para
+ocultar botones y rutas. Si el frontend los obtuviera de `GET /api/v1/roles`, ese endpoint
+tendria que estar abierto a todo el mundo, y con el exponiendo el catalogo completo de la
+organizacion. Con los permisos efectivos en `me`, `GET /roles` queda para quien administra.
+
+**Por que cambiar la contrasena tiene endpoint propio.** El frontend puede llamar a
+Supabase Auth para cambiar la clave, pero entonces nadie limpia
+`perfiles.debe_cambiar_contrasena`, y la bandera quedaría diciéndole al usuario que la
+cambie cuando ya la cambió. El
+backend recibe la peticion, verifica el token, confirma el cambio y limpia la bandera en
+la misma operacion.
+
+### 7.0 Ciclo de vida de un analisis
+
+`[DECIDIDO]` **Seis pasos, seis endpoints, y ningun endpoint con dos meanings.** El error
+que este diseño evita: usar `POST /api/v1/documentos` tanto para crear el documento como
+para entregar el resultado. Dos operaciones con permisos y precondiciones distintas no
+comparten una ruta.
+
+| # | Quien | Endpoint | Que hace |
+|---|---|---|---|
+| 1 | Cliente | `POST /api/v1/documentos` | Registra el documento (nombre, hash, paginas, tamano). Crea el documento en `en_proceso` y devuelve la **URL de subida firmada** |
+| 2 | Cliente | `PUT` a Supabase Storage | Sube el PDF **directo** al bucket privado. El PDF no pasa por la funcion |
+| 3 | Cliente | `POST /api/v1/documentos/{id}/archivo` | Confirma la subida. El backend verifica el objeto en Storage y guarda `ruta_archivo` |
+| 4 | Cliente | `POST /api/v1/trabajos` | Abre el trabajo de analisis para ese documento. Responde `trabajo_id` |
+| 5 | Cliente | `POST /api/v1/trabajos/{id}/progreso` | Reporta avance y bitacora mientras corre el pipeline |
+| 6 | Cliente | `POST /api/v1/documentos/{id}/analisis` | Registra el resultado. Se valida contra el esquema de la plantilla y se persiste en **una sola transaccion** |
+
+El paso 6 cierra tambien el trabajo: documento en `completado`, trabajo en `completado` y
+`duracion_ms` calculada por el servidor. Todo en la misma transaccion.
+
+**Por que el resultado no viaja en el paso 1.** El paso 1 ocurre **antes** de que exista
+el archivo: todavia no se sabe si el analisis va a funcionar. Entregar el resultado ahi
+obligaria a que el documento existiera antes de saber si se podia procesar.
+
+**Por que el trabajo se abre aparte (paso 4).** Un documento y un trabajo no son lo mismo:
+el documento es la entrada, el trabajo es el proceso. Un reanálisis (ADR-25) crea un
+trabajo nuevo sobre el mismo documento. Si el trabajo se creara al registrar el
+documento, no habria forma de reanalizar sin crear otro documento.
 
 ### 7.1 Envelope
 
@@ -1189,14 +1503,65 @@ Variables de entorno obligatorias:
 
 | Variable | Default | Nota |
 |---|---|---|
-| `SUPABASE_URL` | ninguno | |
+| `SUPABASE_URL` | ninguno | Tambien define el emisor del JWT: `{SUPABASE_URL}/auth/v1` |
 | `SUPABASE_ANON_KEY` | ninguno | Llave publica para el frontend |
 | `SUPABASE_SERVICE_ROLE_KEY` | ninguno | Solo backend. Nunca en el frontend |
-| `SUPABASE_JWT_SECRET` | ninguno | Verificacion del JWT de Supabase. Minimo 32 caracteres |
-| `DATABASE_URL` | ninguno | Solo para Alembic en desarrollo |
+| `SUPABASE_JWT_SECRET` | ninguno | Solo para proyectos con claves simetricas (HS256). Los proyectos nuevos usan JWKS |
+| `SUPABASE_JWKS_URL` | `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` | Claves publicas para validar tokens asimetricos (RS256/ES256) |
+| `DATABASE_URL` | ninguno | Solo para el script de validacion de migraciones en desarrollo |
 | `MAX_UPLOAD_MB` | `50` | Solo aplica a partir de la v2 |
 | `CORS_ORIGINS` | ninguno | Lista separada por comas |
 | `LOG_LEVEL` | `INFO` | |
+
+Variables del frontend (publicas por definicion, `VITE_` las expone al bundle):
+
+| Variable | Default | Nota |
+|---|---|---|
+| `VITE_SUPABASE_URL` | ninguno | La misma URL del backend |
+| `VITE_SUPABASE_ANON_KEY` | ninguno | La llave publica. **Nunca** la `service_role` |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Donde vive la API |
+
+**El `.env.example` se versiona antes de la primera linea de codigo.** Es el contrato
+entre la maquina y el proyecto: si una variable no esta en el `.env.example`, no existe.
+El `.env` local **no** se versiona nunca (ya esta en `.gitignore`).
+
+```
+backend/.env.example
+  SUPABASE_URL=https://TU-PROYECTO.supabase.co
+  SUPABASE_ANON_KEY=tu-llave-publica
+  SUPABASE_SERVICE_ROLE_KEY=tu-llave-de-servicio
+  SUPABASE_JWT_SECRET=                      # solo con claves simetricas
+  SUPABASE_JWKS_URL=https://TU-PROYECTO.supabase.co/auth/v1/.well-known/jwks.json
+  DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
+  MAX_UPLOAD_MB=50
+  CORS_ORIGINS=http://localhost:5173
+  LOG_LEVEL=INFO
+
+frontend/.env.example
+  VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+  VITE_SUPABASE_ANON_KEY=tu-llave-publica
+  VITE_API_BASE_URL=http://localhost:8000
+```
+
+### 8.1 Que hace `GET /health`
+
+`[DECIDIDO]` La sonda **no** dice "estoy vivo" sin mas. Consulta una vista publica que
+confirma que la base responde y que las migraciones estan aplicadas:
+
+```sql
+-- Vista publica: no expone datos de negocio.
+create or replace view public.salud as
+  select
+    (select count(*) from public.roles) as roles_cargados,
+    (select count(*) from public.permisos) as permisos_cargados;
+```
+
+`GET /health` responde **200** si la consulta devuelve filas y los roles estan cargados, y
+**503** si Supabase no responde o el esquema no esta aplicado. Sin `service_role`: la
+vista es legible por todos y no contiene datos de usuario.
+
+Un healthcheck que siempre responde 200 no sirve para nada: no distingue "todo bien" de
+"la base no esta".
 
 ---
 
@@ -1252,8 +1617,8 @@ Consecuencias que hay que aceptar:
   "crear documento + N bloques + analisis" se resuelve con una **funcion de Postgres**
   (`security definer`, con sus propias comprobaciones de RLS) llamada por RPC. La
   transaccion vive dentro de la base de datos, donde pertenece.
-- **Alembic si necesita una conexion directa** a Postgres, pero solo en desarrollo y en
-  el paso de migracion. No es parte del camino de ejecucion.
+- **Las migraciones se aplican con el CLI de Supabase**, no con Alembic. `supabase db push`
+  en el despliegue y `supabase db reset` en local. Ver ADR-32.
 - El filtrado por RLS sigue funcionando: si el backend reenvia el `Authorization: Bearer`
   del usuario, PostgREST lo usa para evaluar las politicas. Es el mecanismo correcto.
 
@@ -1293,10 +1658,11 @@ Por que en la base y no en Redis, cuando llegue:
 El **worker**, en cambio, si necesita un proceso que viva: por eso va en un contenedor
 (nivel 4), no en Vercel Functions.
 
-Lo que si hay en la v1 es una **tarea de mantenimiento** para los trabajos abandonados (la
-pestana se cerro a mitad del analisis): un `cron` de Vercel la dispara, y marca los
-trabajos sin latido como `interrumpido`. Es barata, y sin ella el usuario ve documentos
-atascados en "en proceso" para siempre.
+Lo que si hay en la v1 es la **expiracion perezosa** de los trabajos abandonados (la
+pestana se cerro a mitad del analisis): cuando alguien consulta un trabajo, un documento o
+la lista de trabajos, los que no han reportado latido en mas de 2 minutos se marcan
+`interrumpido` en la misma operacion. Es un `update` barato, indexado, y no depende de que
+haya un plan de Vercel con cron frecuente. Ver ADR-24.
 
 ### 9.5 Perfil de despliegue: la demo gratuita
 
@@ -1346,7 +1712,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 
 | ID | Decision | Fecha | Estado | Motivo |
 |---|---|---|---|---|
-| ADR-01 | Python 3.15.2 + FastAPI 0.165.0 + Vue 3.5.46 | 2026-11-27 | Aceptada | Combinacion actual y estable; versiones verificadas contra PyPI, npm y python.org |
+| ADR-01 | Python 3.14.10 + FastAPI 0.165.0 + Vue 3.5.46 | 2026-11-27 | Aceptada | Combinacion actual y estable; versiones verificadas contra PyPI, npm, python.org y los runtimes de Vercel. El pin exacto esta en la seccion 1.0 (ADR-27 y ADR-28) |
 | ADR-02 | Nucleo hexagonal (puertos y adaptadores) | 2026-11-27 | Aceptada | Tres adaptadores de salida intercambiables y dos modos de ejecucion del pipeline. Decidirlo antes de escribir codigo, porque revertirlo es caro |
 | ADR-03 | Frontend Vue 3.5.46 + Vite + TypeScript + Pinia | 2026-11-27 | Aceptada | Correccion explicita del React del documento original |
 | ADR-04 | Acceso a datos por HTTP (PostgREST) en vez de TCP a Postgres | 2026-11-27 | Aceptada | Hace el backend stateless y portable a Cloudflare Workers sin cambios. La atomicidad se resuelve con funciones de Postgres (RPC) |
@@ -1354,7 +1720,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-06 | LLM ejecutado en el navegador del usuario como camino principal | 2026-11-27 | Aceptada | Privacidad maxima (el documento no sale del equipo), cero costo de GPU, y encaja con Vercel: sin ETL pesado en el servidor. DP-11 lo confirma: sin modelo hospedado, la v1 no necesita GPU, ni worker, ni cola en el servidor |
 | ADR-07 | Despliegue en niveles: Vercel (frontend + API), Supabase (datos), Docker (entorno local) | 2026-11-27 | Aceptada | Vercel no ejecuta Docker en produccion; el Dockerfile sirve para reproducibilidad local y para el camino a servidor privado |
 | ADR-08 | El tamano de bloque se deriva de la ventana de contexto del modelo | 2026-11-27 | Aceptada | Los modelos de WebLLM vienen con 4K de contexto; 10 paginas desbordan la ventana |
-| ADR-09 | El Reduce es jerarquico | 2026-11-27 | Aceptada | Con bloques de 3 paginas, 100 paginas producen ~34 resumenes que no caben en 4K |
+| ADR-09 | El Reduce es jerarquico | 2026-11-27 | Aceptada | Con bloques de 3 paginas, 100 paginas producen ~50 resumenes que no caben en 4K |
 | ADR-10 | La cola de analisis vive en el cliente (Web Worker); el servidor solo lleva el estado | 2026-11-27 | Aceptada | El LLM corre en el navegador, asi que no hay cola en el servidor. El `pgmq` queda documentado para un eventual modo hospedado, no se construye en la v1 |
 | ADR-11 | Documentos digitales con capa de texto; sin OCR en la v1 | 2026-11-27 | Aceptada | Un PDF escaneado se marca como error explicito, nunca como analisis vacio |
 | ADR-12 | Sistema de roles y permisos granular, con la matriz en datos | 2026-11-27 | Aceptada | El objetivo declarado es controlar que informacion ve cada usuario. La matriz en tablas permite agregar permisos sin desplegar |
@@ -1369,10 +1735,17 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-21 | El primer despliegue usa planes gratuitos (Vercel Hobby + Supabase Free) | 2026-11-27 | Aceptada | Permite mostrar el producto sin gasto. Se documentan las tres limitaciones del plan gratuito (pausa por inactividad, SMTP de 2 correos/hora, uso no comercial en Hobby) para que se anticipen y no se descubran en vivo |
 | ADR-22 | Retencion por defecto: los documentos se conservan hasta que el dueno o un admin los borra, sin expiracion automatica | 2026-11-27 | Aceptada | Es el supuesto que menos impone para la demo. Se cambia por decision del cliente cuando se conozca su politica y su base legal. **No es una politica de retencion final** |
 | ADR-23 | El motor LLM, el almacenamiento y el despliegue son intercambiables por diseño; un proveedor de modelos hospedado exige un ADR propio | 2026-11-27 | Aceptada | El cliente puede tener un contrato con un proveedor de modelos, o su propio S3 o SFTP. Los puertos lo permiten; lo que cambia es el adaptador. Un motor hospedado cambia la postura de privacidad, asi que no es un default: se activa explicitamente y queda registrado |
-| ADR-24 | El trabajo abandonado se marca `interrumpido` por una tarea de mantenimiento que detecta la falta de latido | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Cierra HU-08 |
+| ADR-24 | El trabajo abandonado se marca `interrumpido` por **expiracion perezosa**, no por un `cron` | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Y no puede depender de un `cron` frecuente: Vercel Hobby corre los cron una vez al dia y una expresion cada 2 minutos falla el despliegue. La expiracion perezosa marca el trabajo la primera vez que alguien lo mira, que es cuando importa. Cierra HU-08 |
 | ADR-25 | El reanálisis conserva el análisis anterior en una tabla de historial y actualiza el vigente | 2026-11-27 | Aceptada | "No sobrescribir" es una promesa vacia si no hay donde conservar lo anterior. La tabla aparte evita relajar el `unique` de `analisis_documentos` y deja el historial con su propia forma. Cierra HU-10 y la parte de DP-13 que faltaba |
 | ADR-26 | El reanálisis se pide por un endpoint propio y el archivo viaja del bucket privado al navegador, nunca por el backend | 2026-11-27 | Aceptada | Reutilizar `POST /documentos` para el reanálisis mezclaría dos operaciones con permisos y precondiciones distintas. Y el PDF no puede pasar por la funcion: el cuerpo de peticion llega a 4.5 MB. Cierra HU-10 |
-| ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Python 3.15.2 lleva un mes en el mercado y el ecosistema de Supabase acaba de cambiar de rama en varios puntos. Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
+| ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
+| ADR-28 | El pin del stack se ajusta a lo que la plataforma de despliegue soporta, no a la ultima version publicada | 2026-11-27 | Aceptada | Python 3.15.2 y TypeScript 7.0.2 son las ultimas versiones de sus respectivos registros, pero **Vercel Functions no ofrece Python 3.15** y **TypeScript 7 rompe `vue-tsc`**. Fijar lo mas nuevo que existe es una promesa que el despliegue no puede cumplir: el error aparece en el primer deploy, no en la revision. Ver 1.0.1 y 1.0.2 |
+| ADR-29 | El ciclo de vida de un analisis son seis endpoints: documento, subida, archivo, trabajo, progreso y resultado | 2026-11-27 | Aceptada | `POST /documentos` se usaba tanto para crear el documento como para entregar el resultado: dos operaciones con permisos y precondiciones distintas sobre la misma ruta. Ademas el resultado no puede entregarse al crear el documento, porque todavia no se sabe si el analisis va a funcionar. El documento es la entrada, el trabajo es el proceso, y el resultado llega al final. Ver seccion 7.0 |
+| ADR-30 | La respuesta es 403 cuando falta el permiso y 404 cuando la fila no existe; el permiso se comprueba antes que la fila | 2026-11-27 | Aceptada | La mitad de los documentos exigia 403 y la otra mitad 404, para el mismo caso. Ademas hay una restriccion tecnica: cuando RLS filtra una fila de otra organizacion, Postgres devuelve cero filas, y el caso de uso no puede distinguir "no existe" de "ocultado" sin usar `service_role`, que esta prohibido. Comprobar el permiso primero resuelve las dos cosas: si falta, 403 sin consultar nada; si esta, la consulta ya aplico RLS y lo que no aparece es 404 |
+| ADR-31 | El backend valida el JWT de Supabase contra el JWKS del proyecto y el cierre de sesion se hace efectivo de inmediato | 2026-11-27 | Aceptada | El emisor real es `{SUPABASE_URL}/auth/v1`; exigir una cadena propia rechazaba todos los tokens reales. Y un JWT stateless no sabe que la sesion se cerro: `signOut()` revoca el refresh token, pero el access token sigue valido hasta su `exp`. Sin un registro de `session_id` revocados, el criterio "401 de inmediato" es falso. El costo es una consulta local indexada, contra una llamada de red por peticion que haria el enfoque alternativo |
+| ADR-32 | Las migraciones son SQL puro en `supabase/migrations/`, aplicadas con el CLI de Supabase | 2026-11-27 | Aceptada | Alembic y el CLI de Supabase sobre la misma base se pisan: `supabase db reset` ejecuta el SQL de `supabase/migrations/` y borra la tabla `alembic_version`, y Alembic no sabe desplegar hacia Supabase Cloud. Como el proyecto ya usa el CLI para el stack local, tener las dos herramientas es una fuente de verdad doble. Ademas el CLI es el unico que sabe aplicar las politicas de `storage.buckets` y `storage.objects`, que Alembic no gestiona |
+| ADR-33 | El aislamiento se resuelve desde `organizaciones_miembros`, y el esquema se completa con las tablas que las historias ya exigian | 2026-11-27 | Aceptada | `perfiles.organizacion_id` es un solo campo, pero un usuario puede pertenecer a varios equipos: una politica que se apoyara en el perfil le daria acceso a la otra organizacion. Y `organizaciones_miembros` no cubre el caso de un `analista` sin `analisis.ver_todos`, que por la puerta de PostgREST leeria los documentos de sus companeros: la matriz de permisos se esquivaba. El DDL, ademas, estaba desincronizado con las historias: faltaban la tabla de auditoria, la de compartidos, la de sesiones revocadas y varias columnas. Como el esquema todavia no existe en ninguna base, se corrige ahora |
+| ADR-34 | Editar una plantilla de extraccion crea una version nueva; la anterior se conserva | 2026-11-27 | Aceptada | Los analisis guardan la version de plantilla que usaron. Si la plantilla se modificara en el sitio, un analisis de hace tres meses quedaria explicando con reglas que ya no son las que se aplicaron, y no habria forma de reconstruir cual era. Versionar tambien permite volver a una version anterior. El precio es una tabla que crece, y una version activa unica garantizada con un indice parcial |
 
 ### 10.1 Como se registra una decision nueva
 
