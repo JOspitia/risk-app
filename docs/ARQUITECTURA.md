@@ -365,14 +365,38 @@ nueva. Ver ADR-32.
 create table organizaciones (
   id          uuid primary key default gen_random_uuid(),
   nombre      text not null,
-  created_at  timestamptz not null default now()
+  creado_en   timestamptz not null default now()
+);
+
+-- Roles y permisos granulares. La matriz vive en datos, no en codigo: agregar un permiso
+-- no requiere desplegar. Se definen antes que `perfiles` porque se referencian.
+create table roles (
+  clave       text primary key,   -- admin | analista | auditor
+  nombre      text not null,
+  descripcion text,
+  -- True = el rol viene con el sistema y no se puede eliminar ni renombrar.
+  is_system   boolean not null default false,
+  creado_en   timestamptz not null default now()
+);
+
+create table permisos (
+  clave       text primary key,   -- documentos.ver | documentos.analizar | ...
+  nombre      text not null,
+  descripcion text not null,
+  creado_en   timestamptz not null default now()
+);
+
+create table rol_permisos (
+  rol     text not null references roles(clave) on delete cascade,
+  permiso text not null references permisos(clave) on delete cascade,
+  primary key (rol, permiso)
 );
 
 -- Perfil del usuario. Extiende auth.users (Supabase Auth).
 create table perfiles (
   id                        uuid primary key references auth.users(id) on delete cascade,
   organizacion_id           uuid references organizaciones(id),
-  rol                       text not null default 'analista',  -- admin | analista | auditor
+  rol                       text not null default 'analista' references roles(clave),
   nombres                   text not null,
   apellido_1                text not null,
   apellido_2                text,
@@ -380,7 +404,29 @@ create table perfiles (
   -- True mientras la credencial sigue siendo la autogenerada y enviada por correo.
   -- Se limpia en el primer inicio de sesion con cambio de contrasena.
   debe_cambiar_contrasena    boolean not null default false,
-  created_at                timestamptz not null default now()
+  -- False = el usuario esta desactivado: no puede iniciar sesion y el resolutor de
+  -- permisos lo trata como sin permisos, sin consultar `auth.users` en cada peticion.
+  activo                    boolean not null default true,
+  creado_en                 timestamptz not null default now(),
+  eliminado_en              timestamptz
+);
+
+-- Pertenencia a una organizacion con un rol propio por equipo.
+create table organizaciones_miembros (
+  organizacion_id uuid not null references organizaciones(id) on delete cascade,
+  usuario_id      uuid not null references auth.users(id) on delete cascade,
+  rol             text not null references roles(clave),
+  creado_en       timestamptz not null default now(),
+  primary key (organizacion_id, usuario_id)
+);
+
+-- Sesiones revocadas. El cierre de sesion invalida el token de inmediato (ADR-31).
+-- Solo guarda el session_id, nunca el token. Las filas caducan con el token.
+create table sesiones_revocadas (
+  session_id   text primary key,
+  usuario_id   uuid references auth.users(id) on delete cascade,
+  revocado_en  timestamptz not null default now(),
+  expira_en    timestamptz not null
 );
 
 -- Plantillas de extraccion: campos dinamicos sin migrar la BD.
@@ -392,7 +438,8 @@ create table plantillas_extraccion (
   esquema          jsonb not null,   -- {"campos":[{"clave","tipo","descripcion","obligatorio"}]}
   instruccion      text not null,
   activa           boolean not null default true,
-  created_at       timestamptz not null default now()
+  creado_en        timestamptz not null default now(),
+  eliminado_en     timestamptz
 );
 
 -- Configuracion del motor IA, por usuario o por organizacion.
@@ -407,7 +454,8 @@ create table configuracion_motor (
   overlap_paginas       int  not null default 1,
   ventana_contexto      int  not null default 4096,
   temperatura           numeric(3,2) not null default 0.10,
-  updated_at            timestamptz not null default now(),
+  actualizado_en        timestamptz not null default now(),
+  eliminado_en          timestamptz,
   -- exactamente un ambito por fila
   constraint configuracion_motor_ambito_unico check (
     (ambito = 'usuario'     and usuario_id is not null and organizacion_id is null) or
@@ -424,16 +472,29 @@ create table documentos (
   hash_sha256       text not null,
   -- Ruta del objeto en el almacenamiento privado. Nulo mientras no se ha subido.
   ruta_archivo      text,
+  tamano_bytes      bigint not null default 0,
+  tipo_mime         text not null default 'application/pdf',
   total_paginas     int,
   modo_procesamiento text not null,   -- navegador_local | servidor_python
   estado            text not null default 'en_proceso',  -- en_proceso | completado | error
   error_mensaje     text,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
+  -- Momento en que el archivo quedo archivado en el bucket privado. Nulo si nunca se subio.
+  archivado_en      timestamptz,
+  creado_en         timestamptz not null default now(),
+  actualizado_en    timestamptz not null default now(),
   eliminado_en      timestamptz
 );
 
--- Bloque analizado (fase Map).
+-- Documentos compartidos con otro usuario de la misma organizacion.
+create table documentos_compartidos (
+  documento_id   uuid not null references documentos(id) on delete cascade,
+  usuario_id     uuid not null references auth.users(id) on delete cascade,
+  compartido_por uuid references auth.users(id) on delete set null,
+  creado_en      timestamptz not null default now(),
+  primary key (documento_id, usuario_id)
+);
+
+-- Bloque analizado (fase Map). Vive en cascada con el documento: no tiene borrado logico.
 create table bloques (
   id                  uuid primary key default gen_random_uuid(),
   documento_id        uuid not null references documentos(id) on delete cascade,
@@ -443,21 +504,25 @@ create table bloques (
   pagina_fin          int  not null,
   resumen             text,
   datos_estructurados jsonb not null,
-  created_at          timestamptz not null default now(),
+  creado_en           timestamptz not null default now(),
   unique (documento_id, indice)
 );
 
--- Analisis consolidado (fase Reduce).
+-- Analisis consolidado (fase Reduce). Un analisis vigente por documento.
 create table analisis_documentos (
   id                uuid primary key default gen_random_uuid(),
   documento_id      uuid not null unique references documentos(id) on delete cascade,
   usuario_id        uuid not null references auth.users(id) on delete cascade,
   plantilla_id      uuid references plantillas_extraccion(id),
   plantilla_version int,
+  -- Modelo que produjo este analisis. Se compara con el del reanálisis para explicar
+  -- diferencias que no vienen de la plantilla (HU-10 EC-05).
+  modelo            text,
+  total_bloques     int,
   resumen_ejecutivo text,
   riesgos           jsonb,
   resumenes         jsonb not null default '[]'::jsonb,  -- un resumen por bloque
-  created_at        timestamptz not null default now()
+  creado_en         timestamptz not null default now()
 );
 
 -- Historial de analisis: cuando un documento se reanaliza con otra plantilla, el
@@ -474,35 +539,7 @@ create table analisis_historial (
   resumenes         jsonb,
   -- Id del analisis vigente que sustituyo a este.
   reemplazado_por   uuid references analisis_documentos(id),
-  created_at        timestamptz not null default now()
-);
-
--- Roles y permisos granulares. La matriz vive en datos, no en codigo: agregar un permiso
--- no requiere desplegar.
-create table roles (
-  clave       text primary key,   -- admin | analista | auditor
-  nombre      text not null,
-  descripcion text
-);
-
-create table permisos (
-  clave       text primary key,   -- documentos.ver | documentos.analizar | ...
-  descripcion text not null
-);
-
-create table rol_permisos (
-  rol     text not null references roles(clave) on delete cascade,
-  permiso text not null references permisos(clave) on delete cascade,
-  primary key (rol, permiso)
-);
-
--- Pertenencia a una organizacion con un rol propio por equipo.
-create table organizaciones_miembros (
-  organizacion_id uuid not null references organizaciones(id) on delete cascade,
-  usuario_id      uuid not null references auth.users(id) on delete cascade,
-  rol             text not null,
-  created_at      timestamptz not null default now(),
-  primary key (organizacion_id, usuario_id)
+  creado_en         timestamptz not null default now()
 );
 
 -- Seguimiento de un analisis en curso.
@@ -514,68 +551,155 @@ create table trabajos (
   estado          text not null default 'en_cola',
                   -- en_cola | en_proceso | completado | error | cancelado | interrumpido
   progreso        int  not null default 0 check (progreso between 0 and 100),
-  paso_actual     text,      -- 'extrayendo' | 'analizando bloque 7 de 34' | 'reduciendo'
+  paso_actual     text,      -- 'extrayendo' | 'analizando bloque 7 de 50' | 'reduciendo'
   modo            text not null,  -- navegador_local | servidor_python
   iniciado_en     timestamptz,
   finalizado_en   timestamptz,
   duracion_ms     bigint,
+  -- Ultimo latido recibido. `created_at` no sirve: los reportes posteriores no lo actualizan.
+  -- Es lo que permite detectar un trabajo abandonado (ADR-24).
+  ultimo_latido_en timestamptz,
   error_mensaje   text,
-  created_at      timestamptz not null default now()
+  creado_en       timestamptz not null default now(),
+  eliminado_en    timestamptz
 );
 
 -- Bitacora de pasos ejecutados (visible en la UI).
 create table trabajo_actividades (
   id            uuid primary key default gen_random_uuid(),
   trabajo_id    uuid not null references trabajos(id) on delete cascade,
+  -- Clave de idempotencia que envia el cliente. Un reintento de red con el mismo
+  -- `id_reporte` no duplica filas (HU-08 CE-06).
+  id_reporte    text not null,
   tipo          text not null,   -- extraccion | bloque | reduce | persistencia
   mensaje       text,
   pagina_inicio int,
   pagina_fin    int,
   duracion_ms   int,
-  created_at    timestamptz not null default now()
+  creado_en     timestamptz not null default now(),
+  unique (trabajo_id, id_reporte)
 );
+
+-- Bitacora de auditoria. Quien hizo que, cuando y desde donde.
+create table auditoria (
+  id            uuid primary key default gen_random_uuid(),
+  organizacion_id uuid references organizaciones(id),
+  usuario_id    uuid references auth.users(id) on delete set null,
+  actor         text not null,          -- correo o identificador del actor
+  accion        text not null,          -- usuario.creado | documento.eliminado | ...
+  entidad       text not null,          -- usuario | documento | plantilla | ...
+  entidad_id    uuid,
+  detalles      jsonb,
+  ip            inet,
+  user_agent    text,
+  creado_en     timestamptz not null default now()
+);
+
+-- Indices
+create index documentos_org_idx        on documentos (organizacion_id, creado_en desc);
+create index documentos_usuario_idx    on documentos (usuario_id, creado_en desc);
+create index bloques_documento_idx     on bloques (documento_id, indice);
+create index analisis_documento_idx    on analisis_documentos (documento_id);
+create index historial_documento_idx   on analisis_historial (documento_id, creado_en desc);
+create index trabajos_documento_idx    on trabajos (documento_id);
+-- Soporta la expiracion perezosa: buscar los trabajos activos sin latido reciente.
+create index trabajos_latido_idx       on trabajos (estado, ultimo_latido_en);
+create index trabajo_actividades_idx   on trabajo_actividades (trabajo_id, creado_en);
+create index auditoria_org_idx         on auditoria (organizacion_id, creado_en desc);
+-- Un documento con el mismo contenido no se vuelve a subir mientras siga vivo.
+create unique index documentos_hash_unico
+  on documentos (usuario_id, hash_sha256) where eliminado_en is null;
 ```
 
 > **Nota sobre `tamano_chunk_paginas`.** El valor por defecto cambio de 10 a 3. Ver seccion
 > 6.2: los modelos de WebLLM vienen con ventana de contexto de 4K tokens, y 10 paginas de
 > texto denso la desbordan.
 
+> **Idioma de las columnas de tiempo.** Todas usan `creado_en`, `actualizado_en` y
+> `eliminado_en`, en espanol, sin excepcion. Antes se mezclaban `created_at` y
+> `actualizado_en` en el mismo esquema, y esa mezcla habia llegado hasta los DTO del
+> `SKILL.md`. Como el esquema todavia no existe en ninguna base, se unifica ahora y no
+> despues: cambiar el nombre de una columna despues es una migracion, no un rename.
+
+> **Que tablas tienen borrado logico.** Las que el usuario puede listar y citar por su
+> cuenta: `perfiles`, `documentos`, `plantillas_extraccion`, `configuracion_motor` y
+> `trabajos`. Las hijas (`bloques`, `analisis_documentos`, `analisis_historial`,
+> `trabajo_actividades`, `documentos_compartidos`) se van en cascada con su padre: un
+> bloque sin documento no tiene sentido y conservarlo no aporta nada.
+
 ### 5.2 RLS
 
-`[DECIDIDO]` RLS activo en toda tabla con datos de usuario. Patron por organizacion:
+`[DECIDIDO]` RLS activo en toda tabla con datos de usuario.
+
+**El aislamiento de organizacion se resuelve desde `organizaciones_miembros`, no desde
+`perfiles.organizacion_id`.** El motivo es concreto: `perfiles` tiene un solo
+`organizacion_id`, pero un usuario puede pertenecer a varios equipos (PP-01). Si la politica
+se apoyara en `perfiles`, el usuario de una segunda organizacion veria todo lo de la
+primera. Y si se apoyara solo en `perfiles`, un `analista` sin `analisis.ver_todos` podria
+leer por PostgREST, con su propio JWT, los documentos de otros analistas de su equipo: la
+matriz de permisos se esquivaria por la puerta de atras.
 
 ```sql
+-- Funcion estable: la organizacion activa del usuario en la peticion.
+create or replace function organizacion_activa()
+returns uuid
+language sql stable
+as $$
+  select m.organizacion_id
+  from organizaciones_miembros m
+  join perfiles p on p.id = m.usuario_id
+  where m.usuario_id = auth.uid()
+    and p.activo
+    and p.eliminado_en is null
+  limit 1;
+$$;
+
 alter table documentos enable row level security;
 
+-- Lectura: lo propio, lo compartido, y lo de la organizacion si el permiso lo autoriza.
 create policy documentos_lectura on documentos
   for select using (
-    organizacion_id = (
-      select p.organizacion_id from perfiles p where p.id = auth.uid()
+    eliminado_en is null
+    and (
+      usuario_id = auth.uid()
+      or exists (
+        select 1 from documentos_compartidos dc
+        where dc.documento_id = documentos.id and dc.usuario_id = auth.uid()
+      )
+      or (
+        organizacion_id = organizacion_activa()
+        and public.usuario_tiene_permiso('analisis.ver_todos')
+      )
     )
   );
 ```
+
+**Dos capas, y por que son distintas.** RLS filtra **filas**: que documentos existen y son
+visibles. El permiso filtra **acciones**: que se puede hacer con ellos. Las dos se
+comprueban. RLS no puede implementar la matriz de permisos por si sola, y la matriz no
+puede saber que filas existen en otra organizacion.
+
+El caso de uso comprueba el permiso **antes** de consultar (ADR-30), asi que RLS no
+necesita responder "403": si el permiso falta, el caso de uso no llega a consultar; si
+falta el permiso de fila, RLS devuelve cero filas y eso es un 404.
 
 Reglas:
 
 - El backend **no** usa la `service_role` key para atender peticiones de usuario final: si la
   usa, RLS queda anulada y el aislamiento depende solo del codigo de aplicacion. Ver DP-05.
-- El rol `admin` ve su organizacion completa; `analista` ve lo de su organizacion segun la
-  politica de comparticion; `auditor` ve todo en modo lectura. `[PROPUESTO]` la matriz exacta
-  depende de DP-04.
 - Las claves de servicio se usan unicamente en el worker, y aun ahi la consulta se acota
   explicitamente por `usuario_id` u `organizacion_id`.
+- Toda tabla con datos de usuario tiene RLS activo, **incluidas** `auditoria`,
+  `documentos_compartidos` y `sesiones_revocadas`.
 
 ### 5.3 Indices
 
+Los indices se crean junto con las tablas, en el mismo bloque de la seccion 5.1. Se
+listan alli para que el DDL completo se lea en un solo sitio.
+
 ```sql
-create index documentos_usuario_idx     on documentos (usuario_id, created_at desc);
-create index documentos_org_idx        on documentos (organizacion_id, created_at desc);
-create index documentos_hash_idx        on documentos (hash_sha256) where eliminado_en is null;
 create index documentos_estado_idx      on documentos (estado) where estado = 'en_proceso';
-create index bloques_documento_idx     on bloques (documento_id, indice);
 create index bloques_riesgos_gin        on bloques using gin (datos_estructurados);
-create index analisis_documento_idx     on analisis_documentos (documento_id);
-create index historial_documento_idx   on analisis_historial (documento_id, created_at desc);
 create index plantillas_org_idx         on plantillas_extraccion (organizacion_id, activa);
 create index miembros_usuario_idx       on organizaciones_miembros (usuario_id);
 create index trabajos_usuario_idx       on trabajos (usuario_id, created_at desc);
@@ -778,13 +902,17 @@ values (
 
 -- Policies sobre storage.objects: controlan toda operacion de archivo,
 -- incluida la creacion de URLs firmadas.
+-- La ruta es {organizacion_id}/{usuario_id}/{documento_id}.pdf, asi que se comprueban
+-- LOS DOS primeros segmentos: validar solo el primero permitiria a un usuario escribir
+-- dentro de la carpeta de otro usuario de su misma organizacion.
 create policy archivos_insertar on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'documentos'
-    and (storage.foldername(name))[1] = (
-      select p.organizacion_id::text from perfiles p where p.id = auth.uid()
-    )
+    and (storage.foldername(name))[1] = organizacion_activa()::text
+    and (storage.foldername(name))[2] = auth.uid()::text
+    and (storage.foldername(name))[3] is not null
+    and lower(right(name, 4)) = '.pdf'
   );
 
 create policy archivos_leer on storage.objects
@@ -792,13 +920,27 @@ create policy archivos_leer on storage.objects
   using (
     bucket_id = 'documentos'
     and (
-      (storage.foldername(name))[1] = (
-        select p.organizacion_id::text from perfiles p where p.id = auth.uid()
-      )
+      (storage.foldername(name))[1] = organizacion_activa()::text
       or exists (
         select 1 from documentos d
-        where d.ruta_archivo = name and d.usuario_id = auth.uid()
+        where d.ruta_archivo = name
+          and d.usuario_id = auth.uid()
+          and d.eliminado_en is null
       )
+    )
+  );
+
+-- El borrado del archivo se autoriza por la misma regla que la lectura. Sin esta
+-- politica, un usuario no podria borrar su propio archivo, que es lo que exige RF-25.
+create policy archivos_borrar on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'documentos'
+    and exists (
+      select 1 from documentos d
+      where d.ruta_archivo = name
+        and d.usuario_id = auth.uid()
+        and d.eliminado_en is null
     )
   );
 ```
