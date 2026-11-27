@@ -60,6 +60,8 @@ Todas las HU usan las mismas 10 secciones, en este orden:
 | [HU-08](HU-08-seguimiento-del-trabajo.md) | Seguimiento del trabajo | RF-17, RF-18, RF-21, ADR-14 | Escrita |
 | [HU-09](HU-09-consulta-de-resultados.md) | Consulta de resultados y descarga | RF-09, RF-19, RF-23, ADR-15 | Escrita |
 | [HU-10](HU-10-reanalisis-con-plantilla-vigente.md) | Reanalisis con la plantilla vigente | RF-24, DP-13, ADR-20 | Escrita |
+| [HU-11](HU-11-plantillas-de-extraccion.md) | Plantillas de extraccion | RF-11, ADR-34 | Escrita |
+| [HU-12](HU-12-eliminacion-de-documento.md) | Eliminacion de un documento y su archivo | RF-25, ADR-20, ADR-22 | Escrita |
 
 ### 3.1 Orden de implementacion
 
@@ -75,12 +77,22 @@ HU-01 (sesion)
    +-> HU-06 (carga) ----------> HU-07 (analisis) --> HU-08 (seguimiento)
    |                                                              |
    +--------------------------------------------------------------+--> HU-09 (consulta)
-                                                                       |
-                                                                       +--> HU-10 (reanalisis)
+   |                                                                      |
+   +-> HU-11 (plantillas) ---> HU-12 (eliminacion)                        |
+   |                                                                      |
+   +----------------------------------------------------------------------+--> HU-10 (reanalisis)
 ```
 
 **HU-01 es la unica bloqueante de todas.** Las demas se pueden construir en cualquier
 orden siempre que sus bloqueos esten resueltos.
+
+**HU-11 (plantillas) va antes que HU-07 (analisis) en la practica**, aunque no lo bloquee
+formalmente: el analisis necesita una plantilla que extraer, y la plantilla semilla v1
+viene en la migracion. Lo que bloquea HU-07 es que la semilla exista, no que la HU este
+terminada.
+
+**HU-12 (eliminacion) es la ultima**: necesita que exista el archivo archivado, que es
+HU-06.
 
 ---
 
