@@ -190,8 +190,10 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 
 1. El usuario abre un documento.
 2. El frontend llama a `GET /api/v1/documentos/{id}`.
-3. El backend comprueba el permiso y que el documento **es visible** para ese usuario. Si
-   no lo es, responde 404: un documento invisible no se distingue de uno que no existe.
+3. El backend comprueba **primero el permiso** y **despues la fila** (ADR-30):
+   - si falta el permiso que la accion exige, responde **403**,
+   - si el permiso esta pero la fila no aparece (no existe, o es de otra organizacion y RLS
+     la filtro), responde **404**.
 4. La respuesta trae nombre, paginas, estado, fechas, error si lo hay, y el estado del
    trabajo si sigue en proceso.
 5. Si el documento esta en proceso, el frontend consulta el trabajo y muestra el progreso.
@@ -227,7 +229,8 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | # | Escenario | Comportamiento del sistema | Codigo |
 |---|---|---|---|
 | SP-01 | El documento **no existe** | 404 | 404 |
-| SP-02 | El documento **existe pero el usuario no puede verlo** | 404. No se distingue del inexistente: no se confirma que hay algo ahi | 404 |
+| SP-02 | El documento es de **otra organizacion** | 404. RLS filtra la fila y la respuesta no confirma que ese identificador exista | 404 |
+| SP-02b | El documento es de la **misma organizacion** pero falta el permiso de la accion | 403. El usuario ya sabe que existe: esta en su equipo. Ocultarlo no aporta seguridad | 403 |
 | SP-03 | El usuario **no tiene `documentos.ver`** | 403. La ausencia de permiso se deniega | 403 |
 | SP-04 | Piden `ambito = organizacion` **sin `analisis.ver_todos`** | 200 con la lista propia. Menos resultados, no un error | 200 |
 | SP-05 | `size = 500` | Se recorta a 100. No es un error | 200 |
@@ -263,7 +266,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | # | Caso | Comportamiento del sistema |
 |---|---|---|
 | CE-01 | El usuario pide el detalle de un documento **con id inventado** | 404. Los UUID no se adivinan |
-| CE-02 | El usuario intenta ver el **analisis de otro usuario** de la misma organizacion | 404 si no tiene `analisis.ver_todos`; 200 si lo tiene. Decide el permiso |
+| CE-02 | El usuario intenta ver el **analisis de otro usuario** de la misma organizacion | 403 si no tiene `analisis.ver_todos`; 200 si lo tiene. Decide el permiso, y el permiso se comprueba antes de consultar |
 | CE-03 | El cliente pide **1000 bloques** en una sola llamada | Se recorta a 100 y se devuelven los metadatos de paginacion |
 | CE-04 | El usuario pide la **descarga 50 veces seguidas** | Cada peticion devuelve una URL nueva de 1 hora. No hay limite en la v1; se documenta como posible abuse |
 | CE-05 | El documento tiene **el nombre con caracteres raros** (comillas, saltos de linea) | Se escapa al serializar. La UI lo muestra literal, sin interpretaion de HTML |
@@ -281,11 +284,14 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 **Entonces** la respuesta no contiene `usuario_id`, `hash_sha256` ni `ruta_archivo`
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
-### CA-02: Un documento invisible no se distingue de uno inexistente
-**Dado** un documento de otro usuario sin permiso
+### CA-02: La respuesta distingue permiso de aislamiento
+**Dado** un documento de **otra organizacion**
 **Cuando** se pide su detalle
 **Entonces** la respuesta es 404
 **Y** el cuerpo no confirma que el documento existe
+**Dado** un documento de la **misma organizacion** sobre el que falta el permiso
+**Cuando** se pide su detalle
+**Entonces** la respuesta es 403
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-03: La paginacion trae metadatos

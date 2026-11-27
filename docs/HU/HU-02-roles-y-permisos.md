@@ -326,11 +326,19 @@ async def ejecutar(self, cmd, ctx: AuditContext) -> list[Documento]:
 **Entonces** esta **dentro del caso de uso**, no solo en el router
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
-### CA-04: 403 y no 404 para un recurso prohibido
-**Dado** un documento que existe pero que el usuario no puede ver
+### CA-04: 403 cuando falta el permiso, 404 cuando la fila no existe
+**Dado** un documento de la organizacion del usuario sobre el que no tiene el permiso de la accion
 **Cuando** pide el detalle
 **Entonces** responde 403 con el codigo `prohibido`
 **Y** la respuesta **no** revela el contenido ni el nombre del recurso
+**Y** el permiso se comprueba **antes** de consultar la fila
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-04b: 404 para un recurso de otra organizacion
+**Dado** un documento que pertenece a otra organizacion
+**Cuando** se pide su detalle con un JWT valido
+**Entonces** responde 404 con el codigo `no_encontrado`
+**Y** la respuesta no confirma que ese identificador exista
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-05: Un usuario desactivado no hace nada

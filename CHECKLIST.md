@@ -48,7 +48,9 @@
       una columna interna
 - [ ] El rol del usuario se verifica en el caso de uso, no solo en el router
 - [ ] Un usuario de otra organizacion recibe 403 o 404, nunca datos
-- [ ] El tipo real del archivo se valida (magic bytes), no solo la extension
+- [ ] El tipo real del archivo se valida en el **navegador** (magic bytes `%PDF-`) antes de
+      subir, y el bucketStorage restringe los MIME permitidos. El backend **no** declara
+      validar magic bytes: nunca ve el archivo (ver I-07 del informe de validacion)
 - [ ] El limite de tamano de archivo se aplica antes de leerlo en memoria
 - [ ] Los logs no contienen contenido del documento ni texto extraido
 - [ ] CORS no es `*` en un entorno con credenciales
@@ -72,7 +74,8 @@
 
 - [ ] El permiso se comprueba en el **caso de uso**, no solo en el router
 - [ ] Un permiso ausente se **deniega**: no hay "permitido por defecto"
-- [ ] Un recurso que existe pero no se puede ver produce **403**, no 404
+- [ ] Un recurso de **otra organizacion** produce **404**, nunca datos
+- [ ] Un recurso de la **misma organizacion** sin permiso produce **403**, no 404 (ADR-30)
 - [ ] La matriz de permisos vive en datos: agregar un permiso no requiere redesplegar
 - [ ] Un usuario sin permiso recibe 403 tambien en las rutas de escritura, no solo de lectura
 - [ ] El `service_role` solo se usa en el adaptador de administracion

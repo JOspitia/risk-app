@@ -245,7 +245,7 @@ trabajos
 | SP-07 | La **plantilla activa fue eliminada** | 404. No hay plantilla vigente contra la cual reanalizar | 404 |
 | SP-08 | El reanalyze **falla a mitad** (el Worker muere) | El trabajo queda `error`, el documento vuelve a `error`, y **el analisis anterior sigue intacto**. Se puede reintentar | 200 con `estado = error` |
 | SP-09 | El usuario **no tiene `documentos.analizar`** | 403 | 403 |
-| SP-10 | El documento es de **otro usuario** | 404, por la misma regla que en HU-09 | 404 |
+| SP-10 | El documento es de **otro usuario** | 404 si es de otra organizacion; 403 si es de la misma y falta el permiso. Ver ADR-30 | 404 / 403 |
 | SP-11 | Se supera el **limite de reananalisises** | 429. El limite se documenta cuando exista | 429 |
 | SP-12 | El **resultado nuevo no supera la validacion** | 422 y no se persiste nada. El analisis anterior sigue siendo el vigente | 422 |
 

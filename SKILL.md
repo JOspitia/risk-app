@@ -1051,9 +1051,23 @@ filtra acciones**.
   caso de uso que lo vuelve a comprobar es redundante; un router que lo consulta y un caso
   de uso que no, es un agujero.
 - Un permiso **ausente se deniega**. Nunca "permitido por defecto".
-- Un recurso que existe pero sobre el que el usuario no tiene permiso produce **403**, no
-  404. Producir 404 para un recurso prohibido oculta la diferencia entre "no existe" y "no
-  es tuyo", y hace el diagnostico mas dificil.
+- **La respuesta depende del orden de las comprobaciones, y el orden es fijo** (ADR-30):
+
+  | Situacion | Respuesta |
+  |---|---|
+  | El usuario **no tiene el permiso** que la accion exige | **403** |
+  | El usuario **si tiene el permiso**, pero la fila no aparece (no existe, o es de otra organizacion y RLS la filtro) | **404** |
+
+  El caso de uso comprueba **el permiso primero** y la fila despues. Por eso no necesita
+  `service_role` para distinguir "no existe" de "no lo puedes ver": si el permiso falta, la
+  respuesta es 403 sin haber consultado nada; si el permiso esta, la consulta con el JWT
+  del usuario ya aplico RLS, y lo que no aparece se responde 404.
+
+- Por que no se responde siempre 404: un 403 es honesto cuando el usuario **ya sabe** que
+  el recurso existe, porque esta en su propia organizacion. Ocultarlo no aporta seguridad:
+  el permiso ya no deja pasar la accion.
+- Por que no se responde siempre 403: un 403 sobre un recurso de **otra organizacion**
+  confirmaria que ese identificador existe. Ahi si es 404.
 - La comprobacion produce `ProhibidoError`, un error de dominio con status 403.
 
 ```python

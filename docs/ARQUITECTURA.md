@@ -638,13 +638,21 @@ cambiar codigo.
 - El permiso se comprueba **en el caso de uso**, no solo en el router. Un router que
   consulta el permiso y el caso de uso que lo vuelve a comprobar es redundante; un router
   que lo consulta y el caso de uso que no, es un agujero.
-- La comprobacion de permiso produce **403**, no 404, cuando el recurso existe pero el
-  usuario no tiene permiso sobre el. Producir 404 para un recurso forbidden oculta la
-  diferencia entre "no existe" y "no es tuyo".
+- **La respuesta sigue un orden fijo** (ADR-30): primero el permiso, despues la fila.
+  - Si el usuario **no tiene el permiso** que la accion exige: **403**.
+  - Si lo tiene, pero la fila no aparece (no existe, o es de otra organizacion y RLS la
+    filtro): **404**.
+
+  Asi el caso de uso no necesita `service_role` para distinguir "no existe" de "no lo puedes
+  ver": si el permiso falta, se responde 403 sin consultar; si el permiso esta, la consulta
+  con el JWT del usuario ya aplico RLS, y lo que no aparece se responde 404.
+- Un **403** es honesto cuando el usuario ya sabe que el recurso existe, porque esta en su
+  propia organizacion. Un **404** evita confirmar que un identificador de otra organizacion
+  existe.
 - La pertenencia a la organizacion se resuelve desde `organizaciones_miembros`, de modo que
   un usuario puede estar en mas de un equipo con un rol distinto en cada uno.
 - RLS y los permisos son capas complementarias, no redundantes: **RLS filtra filas**, el
-  **permiso filra acciones**. Un permiso ausente debe ser denegado, no "permitido por
+  **permiso filtra acciones**. Un permiso ausente debe ser denegado, no "permitido por
   defecto".
 
 ### 5.6 Creacion de usuarios
@@ -1446,6 +1454,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
 | ADR-28 | El pin del stack se ajusta a lo que la plataforma de despliegue soporta, no a la ultima version publicada | 2026-11-27 | Aceptada | Python 3.15.2 y TypeScript 7.0.2 son las ultimas versiones de sus respectivos registros, pero **Vercel Functions no ofrece Python 3.15** y **TypeScript 7 rompe `vue-tsc`**. Fijar lo mas nuevo que existe es una promesa que el despliegue no puede cumplir: el error aparece en el primer deploy, no en la revision. Ver 1.0.1 y 1.0.2 |
 | ADR-29 | El ciclo de vida de un analisis son seis endpoints: documento, subida, archivo, trabajo, progreso y resultado | 2026-11-27 | Aceptada | `POST /documentos` se usaba tanto para crear el documento como para entregar el resultado: dos operaciones con permisos y precondiciones distintas sobre la misma ruta. Ademas el resultado no puede entregarse al crear el documento, porque todavia no se sabe si el analisis va a funcionar. El documento es la entrada, el trabajo es el proceso, y el resultado llega al final. Ver seccion 7.0 |
+| ADR-30 | La respuesta es 403 cuando falta el permiso y 404 cuando la fila no existe; el permiso se comprueba antes que la fila | 2026-11-27 | Aceptada | La mitad de los documentos exigia 403 y la otra mitad 404, para el mismo caso. Ademas hay una restriccion tecnica: cuando RLS filtra una fila de otra organizacion, Postgres devuelve cero filas, y el caso de uso no puede distinguir "no existe" de "ocultado" sin usar `service_role`, que esta prohibido. Comprobar el permiso primero resuelve las dos cosas: si falta, 403 sin consultar nada; si esta, la consulta ya aplico RLS y lo que no aparece es 404 |
 
 ### 10.1 Como se registra una decision nueva
 
