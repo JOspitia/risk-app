@@ -206,8 +206,8 @@ bloques y el backend recibe 34, ambos coinciden.
 
 ### 7.5 Enviar y persistir
 
-1. El frontend llama a `POST /api/v1/documentos` con el resumen ejecutivo, los riesgos y los
-   34 resumenes.
+1. El frontend llama a `POST /api/v1/documentos/{id}/analisis` con el resumen ejecutivo, los
+   riesgos y los resumenes por bloque.
 2. El backend valida **todo** contra el esquema de la plantilla:
    - si un resumen no cumple, se rechaza el conjunto entero (respuesta 422),
    - si el numero de bloques no coincide con el esperado, se rechaza,
@@ -216,6 +216,10 @@ bloques y el backend recibe 34, ambos coinciden.
    de Postgres por RPC).
 4. El backend marca el trabajo como completado.
 5. Responde 201 con el `documento_id` y el resumen ejecutivo.
+
+> El resultado **no** viaja en `POST /api/v1/documentos`. Ese endpoint registra el
+> documento y devuelve la URL de subida; el resultado llega despues, en su propio
+> endpoint. Ver `ARQUITECTURA.md` seccion 7.0 (ADR-29).
 
 ---
 

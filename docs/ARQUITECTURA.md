@@ -1161,12 +1161,14 @@ cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la 
 | GET | `/api/v1/plantillas` | Lista plantillas de extraccion activas | Si |
 | POST | `/api/v1/plantillas` | Crea plantilla (admin) | Si |
 | GET | `/api/v1/documentos` | Lista paginada con filtro por estado y ambito | Si |
-| POST | `/api/v1/documentos` | Registra el resultado de un analisis (v1) | Si |
+| POST | `/api/v1/documentos` | Registra el documento y devuelve la URL de subida firmada | Si, `documentos.analizar` |
 | POST | `/api/v1/documentos/subir` | Sube el PDF para analisis en servidor (v2) | Si |
 | GET | `/api/v1/documentos/{id}` | Detalle, estado y analisis | Si |
 | GET | `/api/v1/documentos/{id}/bloques` | Bloques con sus datos estructurados | Si |
-| DELETE | `/api/v1/documentos/{id}` | Soft delete | Si |
+| GET | `/api/v1/documentos/{id}/historial` | Analisis anteriores del documento (tras un reanálisis) | Si |
+| DELETE | `/api/v1/documentos/{id}` | Soft delete y borrado del archivo archivado | Si, dueno o admin |
 | GET | `/api/v1/documentos/{id}/analisis` | Analisis completo (DTO de salida) | Si |
+| POST | `/api/v1/documentos/{id}/analisis` | Registra el resultado del analisis y lo persiste | Si (dueno) |
 | POST | `/api/v1/documentos/{id}/archivo` | Confirma la subida y guarda la ruta | Si, dueno |
 | GET | `/api/v1/documentos/{id}/descarga` | URL firmada de descarga (1 h) | Si, `documentos.ver` |
 | POST | `/api/v1/documentos/{id}/reanalisis` | Reanaliza un documento archivado con la plantilla vigente | Si, `documentos.analizar` |
@@ -1178,6 +1180,34 @@ cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la 
 | POST | `/api/v1/usuarios` | Crea un usuario, le asigna rol y envia la credencial temporal | Si, admin |
 | PATCH | `/api/v1/usuarios/{id}` | Cambia rol, organizacion o estado | Si, admin |
 | GET | `/api/v1/roles` | Catalogo de roles y sus permisos | Si |
+
+### 7.0 Ciclo de vida de un analisis
+
+`[DECIDIDO]` **Seis pasos, seis endpoints, y ningun endpoint con dos meanings.** El error
+que este diseño evita: usar `POST /api/v1/documentos` tanto para crear el documento como
+para entregar el resultado. Dos operaciones con permisos y precondiciones distintas no
+comparten una ruta.
+
+| # | Quien | Endpoint | Que hace |
+|---|---|---|---|
+| 1 | Cliente | `POST /api/v1/documentos` | Registra el documento (nombre, hash, paginas, tamano). Crea el documento en `en_proceso` y devuelve la **URL de subida firmada** |
+| 2 | Cliente | `PUT` a Supabase Storage | Sube el PDF **directo** al bucket privado. El PDF no pasa por la funcion |
+| 3 | Cliente | `POST /api/v1/documentos/{id}/archivo` | Confirma la subida. El backend verifica el objeto en Storage y guarda `ruta_archivo` |
+| 4 | Cliente | `POST /api/v1/trabajos` | Abre el trabajo de analisis para ese documento. Responde `trabajo_id` |
+| 5 | Cliente | `POST /api/v1/trabajos/{id}/progreso` | Reporta avance y bitacora mientras corre el pipeline |
+| 6 | Cliente | `POST /api/v1/documentos/{id}/analisis` | Registra el resultado. Se valida contra el esquema de la plantilla y se persiste en **una sola transaccion** |
+
+El paso 6 cierra tambien el trabajo: documento en `completado`, trabajo en `completado` y
+`duracion_ms` calculada por el servidor. Todo en la misma transaccion.
+
+**Por que el resultado no viaja en el paso 1.** El paso 1 ocurre **antes** de que exista
+el archivo: todavia no se sabe si el analisis va a funcionar. Entregar el resultado ahi
+obligaria a que el documento existiera antes de saber si se podia procesar.
+
+**Por que el trabajo se abre aparte (paso 4).** Un documento y un trabajo no son lo mismo:
+el documento es la entrada, el trabajo es el proceso. Un reanálisis (ADR-25) crea un
+trabajo nuevo sobre el mismo documento. Si el trabajo se creara al registrar el
+documento, no habria forma de reanalizar sin crear otro documento.
 
 ### 7.1 Envelope
 
@@ -1415,6 +1445,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-26 | El reanálisis se pide por un endpoint propio y el archivo viaja del bucket privado al navegador, nunca por el backend | 2026-11-27 | Aceptada | Reutilizar `POST /documentos` para el reanálisis mezclaría dos operaciones con permisos y precondiciones distintas. Y el PDF no puede pasar por la funcion: el cuerpo de peticion llega a 4.5 MB. Cierra HU-10 |
 | ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
 | ADR-28 | El pin del stack se ajusta a lo que la plataforma de despliegue soporta, no a la ultima version publicada | 2026-11-27 | Aceptada | Python 3.15.2 y TypeScript 7.0.2 son las ultimas versiones de sus respectivos registros, pero **Vercel Functions no ofrece Python 3.15** y **TypeScript 7 rompe `vue-tsc`**. Fijar lo mas nuevo que existe es una promesa que el despliegue no puede cumplir: el error aparece en el primer deploy, no en la revision. Ver 1.0.1 y 1.0.2 |
+| ADR-29 | El ciclo de vida de un analisis son seis endpoints: documento, subida, archivo, trabajo, progreso y resultado | 2026-11-27 | Aceptada | `POST /documentos` se usaba tanto para crear el documento como para entregar el resultado: dos operaciones con permisos y precondiciones distintas sobre la misma ruta. Ademas el resultado no puede entregarse al crear el documento, porque todavia no se sabe si el analisis va a funcionar. El documento es la entrada, el trabajo es el proceso, y el resultado llega al final. Ver seccion 7.0 |
 
 ### 10.1 Como se registra una decision nueva
 
