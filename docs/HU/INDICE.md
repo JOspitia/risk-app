@@ -4,7 +4,7 @@
 > feliz, los caminos de error y los **criterios de aceptacion** verificables.
 >
 > Que no duplican la especificacion tecnica: eso vive en [`../ARQUITECTURA.md`](../ARQUITECTURA.md)
-> (26 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
+> (27 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
 > **valor para el usuario** y el **como se comprueba que esta listo**.
 
 - **Estado:** vigente
@@ -19,7 +19,7 @@
 | Ya existe | Lo que aporta la HU |
 |---|---|
 | Requisitos funcionales (RF-01 a RF-25) en `CONTEXTO.md` | El **recorrido** del usuario, no la lista de capacidades |
-| 26 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
+| 27 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
 | Los 9 contratos de codigo del `SKILL.md` | Los **criterios de aceptacion** en formato PASS / FAIL |
 | 17 gates de verificacion en `CHECKLIST.md` | El **alcance**: que queda explicitamente fuera |
 

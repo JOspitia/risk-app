@@ -12,22 +12,54 @@
 
 ## 1. Stack y versiones
 
-`[DECIDIDO]` Combinacion actual y estable para trabajar en conjunto.
+`[DECIDIDO]` Combinacion actual y estable para trabajar en conjunto. **Las versiones se
+fijan con pin exacto** en `pyproject.toml` y `package.json`: un stack que se mueve solo es
+un stack que se rompe en silencio, y el breakage aparece en produccion, no en el
+`pyproject.toml`.
 
-| Componente | Version | Verificado | Nota |
+### 1.0 Versiones fijadas
+
+Verificadas contra los registros oficiales (PyPI, npm y nodejs.org) el **2026-11-27**.
+
+| Componente | Version | Publicada | Nota |
 |---|---|---|---|
-| Python | **3.15.2** | 2026-11-27 | Publicada 2026-10-25, estable |
-| FastAPI | **0.165.0** | 2026-11-27 | Publicada 2026-11-18; requiere Python >= 3.11 |
-| Vue | **3.5.46** | 2026-11-27 | `npm view vue version` |
-| Vite | 8.4.0 | 2026-11-27 | Toolchain de build del frontend |
-| PostgreSQL | 16 (via Supabase) | - | Almacenamiento central |
-| Supabase | Plan Pro | - | Auth + Postgres + RLS + PostgREST + Storage |
+| Python | **3.15.2** | 2026-10-25 | Estable. El motor de inferencia corre en el navegador, no aqui |
+| FastAPI | **0.165.0** | 2026-11-18 | `requires_python >= 3.11`; declara `Python :: 3.15` |
+| supabase (SDK de Python) | **2.34.1** | 2026-11-06 | `requires_python >= 3.11` (dejo 3.9 y 3.10 en 2.34.0) |
+| Vue | **3.5.46** | 2026-11 | Rama 3.5, parche activo |
+| Vite | **8.4.0** | 2026-11-26 | Empaquetador **Rolldown** (`rolldown ~1.3.2`) |
+| TypeScript | **7.0.2** | 2026-07-08 | Port nativo (Go). La serie 5.9 sigue disponible si hace falta |
+| Node.js | **24 o 26** (LTS) | - | El piso real lo impone `@supabase/supabase-js`: `>= 22.0.0` |
+| @supabase/supabase-js | **2.119.2** | 2026-11-19 | `engines.node >= 22.0.0` |
+| @mlc-ai/web-llm | **0.2.89** | 2026-11-17 | 175 modelos en el catalogo. Ver 6.2 |
+| Supabase CLI | **3.4.0** | 2026-11-24 | Rama v3 (`latest`). El dist-tag `v2.stable` apunta a 2.122.1 |
+| PostgreSQL | **17** | - | Supabase mantiene las ramas 15 y 17; el soporte de 14 termino en 2026-07-01 |
+| PostgREST | **14** | - | La Data API de Supabase |
+| Supabase (plan) | **Free** | - | Primer despliegue, ADR-21. Sube a Pro si el demo es un trabajo facturado |
+
+**El SDK de Python va en 2.34.1, no en la ultima de la serie 2.** La 2.34.1 es la que
+declara `requires_python >= 3.11` y por tanto admite 3.15 sin problema.
+
+**El CLI tiene dos ramas vivas.** `latest` es la v3 (3.4.0) y la v2 sigue viva bajo el
+dist-tag `v2.stable` (2.122.1). Se usa la **v3**; la v2 queda anotada por si una
+herramienta del flujo de migraciones todavia la espera.
+
+**`requirements.txt` no: es `pyproject.toml`.** El backend se gestiona con `uv`. Lo que
+importa de la idea es que las dependencias del backend sean **ligeras**: la inferencia no
+ocurre en Python, asi que no hay `torch` ni `numpy` con ruedas pesadas. Solo `fastapi`,
+`pydantic`, `httpx` y el SDK de Supabase.
 
 `[DECIDIDO]` El frontend es **Vue 3.5.46**, no React. La version original del documento de
 contexto describia React; queda corregido aqui de forma explicita para evitar que el
 documento viejo se lea como vigente.
 
-### 1.1 Toolchain del backend
+### 1.1 Requisitos de navegador
+
+`[DECIDIDO]` El modo navegador (ADR-06) exige **WebGPU**. El piso de navegador soportado
+es el que aparece en `CONTEXTO.md` seccion 5.2: Chrome y Edge 113+, Firefox 141+ en
+Windows, y **Safari 26 en macOS Tahoe 26 / iOS 26** — no en macOS 15 ni anteriores.
+
+### 1.2 Toolchain del backend
 
 | Categoria | Eleccion | Nota |
 |---|---|---|
@@ -43,19 +75,31 @@ documento viejo se lea como vigente.
 | Calidad | `ruff` (lint + format), `mypy` (tipos estricto) | |
 | Containers | `docker compose` | Entorno local reproducible + worker de la v2 |
 
-### 1.2 Toolchain del frontend
+**El conjunto de dependencias del backend es deliberadamente ligero.** La inferencia ocurre
+en el navegador, asi que Python no carga con el peso de la IA: no hay `torch`, ni `numpy`
+con ruedas pesadas, ni servidor de modelos. El nucleo es `fastapi[standard]`, `pydantic`,
+`httpx` y el SDK de Supabase, mas `alembic` para migrar y `pytest` para probar. Una
+dependencia que no justifique su peso se rechaza en la revision.
+
+### 1.3 Toolchain del frontend
 
 | Categoria | Eleccion | Nota |
 |---|---|---|
 | Framework | Vue 3.5.46 (`<script setup>`, Composition API) | |
-| Build | Vite 8.4.0 + TypeScript | |
+| Build | Vite 8.4.0 + TypeScript 7.0.2 | Empaquetador Rolldown |
 | Estado | Pinia | Estado de sesion, configuracion del motor, documentos |
 | Enrutado | Vue Router | |
 | Estilos | Tailwind CSS | Coherente con la version original del documento |
 | Cliente HTTP | `fetch` tipado con interceptor de token | `fetch` nativo basta para el volumen esperado |
+| Cliente de datos | `@supabase/supabase-js` 2.119.2 | Requiere Node >= 22. Lo que habla con PostgREST |
 | ETL en navegador | `pdf.js` | Extraccion de texto por pagina |
-| LLM en navegador | `@mlc-ai/web-llm` | Ejecucion en Web Worker |
+| LLM en navegador | `@mlc-ai/web-llm` 0.2.89 | Ejecucion en Web Worker, **nunca** en el hilo principal |
 | Chunking | Funcion propia compartida con el backend | Mismo algoritmo en ambos lados |
+
+**El motor LLM vive en un Web Worker.** Cargar 1.5 a 3 GB de pesos y luego generar token a
+token en el hilo principal bloquearia la interfaz: la app dejaria de responder mientras se
+analiza, que es justo el requisito de que la aplicacion no se afecte. Vite 8 empaqueta los
+modulos de WebAssembly de forma nativa, asi que el worker se importa sin rodeos.
 
 ---
 
@@ -841,7 +885,8 @@ plantilla.esquema  ->  modelo Pydantic dinamico  ->  llamada LLM con schema JSON
 WebLLM admite generacion restringida por gramatica (JSON Schema) a traves de
 `response_format`. Eso reduce drasticamente los reintentos, pero **no los sustituye**: la
 validacion en el backend sigue siendo obligatoria, porque el cliente no es una frontera de
-confianza. Verificar la firma exacta en la version fijada de `@mlc-ai/web-llm`.
+confianza. Verificar la firma exacta en la version fijada de `@mlc-ai/web-llm`
+(**0.2.89**, seccion 1.0).
 
 ### 6.5 Privacidad en el limite de salida
 
@@ -1327,6 +1372,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-24 | El trabajo abandonado se marca `interrumpido` por una tarea de mantenimiento que detecta la falta de latido | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Cierra HU-08 |
 | ADR-25 | El reanálisis conserva el análisis anterior en una tabla de historial y actualiza el vigente | 2026-11-27 | Aceptada | "No sobrescribir" es una promesa vacia si no hay donde conservar lo anterior. La tabla aparte evita relajar el `unique` de `analisis_documentos` y deja el historial con su propia forma. Cierra HU-10 y la parte de DP-13 que faltaba |
 | ADR-26 | El reanálisis se pide por un endpoint propio y el archivo viaja del bucket privado al navegador, nunca por el backend | 2026-11-27 | Aceptada | Reutilizar `POST /documentos` para el reanálisis mezclaría dos operaciones con permisos y precondiciones distintas. Y el PDF no puede pasar por la funcion: el cuerpo de peticion llega a 4.5 MB. Cierra HU-10 |
+| ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Python 3.15.2 lleva un mes en el mercado y el ecosistema de Supabase acaba de cambiar de rama en varios puntos. Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
 
 ### 10.1 Como se registra una decision nueva
 
