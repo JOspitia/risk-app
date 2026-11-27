@@ -85,28 +85,37 @@ navegador. El navegador **reporta**; el servidor **decide**.
 | `intervalo_polling_ms` | 2000 | Frecuencia del polling al endpoint de trabajo |
 | `timeout_latido_ms` | 120000 | **2 minutos.** Sin latido en este margen, el trabajo se considera abandonado |
 | `duracion_latido_max_ms` | 30000 | Cada reporte de progreso lleva su propio latido |
-| `progreso_por_bloque` | derivado | `100 / total_bloques`. Con 34 bloques, ~2.9 puntos por bloque |
+| `progreso_por_bloque` | derivado | `100 / total_bloques`, repartido por etapas. Ver abajo |
 | `max_intentos_reanudacion` | 3 | Intentos de reanudar un trabajo interrumpido desde la UI |
 | `tamaño_pagina_trabajos` | 20 | Pagina del listado de trabajos |
 
 ### Reparto del progreso
 
-El progreso **no se proyecta por tiempo transcurrido**. Con 34 bloques, cada bloque vale
-~2.9 puntos. Si un bloque tarda el doble que los demas, proyectar por tiempo miente: la
+El progreso **no se proyecta por tiempo transcurrido**. Con 50 bloques, cada bloque vale
+2 puntos. Si un bloque tarda el doble que los demas, proyectar por tiempo miente: la
 barra llegaria al 90% cuando apenas va por la mitad.
 
+La formula es **una sola**, y las etapas tienen peso:
+
 ```
-progreso = floor(bloques_completados * 100 / total_bloques)
+progreso = floor(
+    5                                          # extraccion del texto
+  + bloques_completados * 85 / total_bloques   # map
+  + 8 * etapas_reduce_completadas / etapas_reduce  # reduce
+  + 2                                          # persistencia
+)
 ```
 
-La fraccion de extraccion y de reduce se reparten como fracciones fijas sobre el total:
+El progreso **es monotono**: nunca disminuye. Un reporte con un porcentaje menor que el
+actual se ignora (o se rechaza con 409).
 
-| Etapa | Fraccion del total |
-|---|---|
-| Extraccion del texto | 5% |
-| Map (bloques) | 85% |
-| Reduce | 8% |
-| Persistencia | 2% |
+Las etapas tienen peso porque los pasos no tienen la misma duracion: extraer el texto es
+rapido, reducir 50 resumenes es lo mas lento, y persistir es instantaneo. Repartir el
+100% entre bloques sin mas haria que la barra se quedara en 5% durante casi todo el
+trabajo.
+
+**Un bloque pesa 85/50 = 1.7 puntos.** Con 100 paginas, tamano 3 y solapamiento 1, el
+documento tiene 50 bloques, no 34: ver `ARQUITECTURA.md` seccion 6.4.
 
 ---
 
@@ -124,8 +133,11 @@ La fraccion de extraccion y de reduce se reparten como fracciones fijas sobre el
    el backend solo inserta, no reemplaza.
 6. El **latido viaja dentro del reporte de progreso**. No es un endpoint aparte: asi no se
    puede olvidar de enviarlo.
-7. El marcado de trabajos abandonados lo hace una **tarea de mantenimiento**, no el
-   cliente: el cliente que cerro la pestana no puede marcar nada.
+7. El marcado de trabajos abandonados lo hace el **servidor, en lectura**: cuando alguien
+   consulta un trabajo, un documento o la lista de trabajos, los que no han reportado
+   latido en mas de 2 minutos se marcan `interrumpido` en esa misma operacion. No hay
+   `cron`: en Vercel Hobby los cron corren una vez al dia y una expresion cada 2 minutos
+   falla el despliegue (ADR-24).
 8. Un trabajo `interrumpido` **no se borra**: se conserva su bitacora, que es la evidencia de
    hasta donde llego el analisis.
 9. El documento en `en_proceso` cuyo trabajo esta `interrumpido` queda **disponible para
@@ -171,8 +183,12 @@ trabajo_actividades
 dueno. Anadirlo duplicaria la fuente de verdad del aislamiento.
 
 **`estado = 'interrumpido'` se agrega a la lista de estados.** Es el estado que deja el
-trabajo abandonado marcado por la tarea de mantenimiento. No es un estado terminal de
+trabajo abandonado cuando la expiracion perezosa lo detecta. No es un estado terminal de
 exito: el documento sigue sin resultado.
+
+**`trabajos.ultimo_latido_en` es obligatoria.** Sin ella no hay forma de saber cuando fue
+el ultimo reporte: `created_at` no sirve, porque los reportes posteriores no lo actualizan.
+El indice parcial `trabajos (estado, ultimo_latido_en)` soporta la consulta de expiracion.
 
 ---
 
@@ -217,10 +233,11 @@ exito: el documento sigue sin resultado.
 
 1. El usuario cierra la pestana a mitad del analisis. El trabajo queda en `en_proceso`.
 2. Pasan 2 minutos sin latido.
-3. La tarea de mantenimiento encuentra el trabajo sin latido y lo marca `interrumpido`,
-   libera el documento y escribe una actividad con el motivo.
-4. Cuando el usuario vuelve a abrir la aplicacion, ve el documento con el estado
-   "interrumpido" y la opcion de **reintentar**.
+3. Cuando el usuario vuelve a abrir la aplicacion y consulta sus documentos, el backend
+   detecta el trabajo sin latido, lo marca `interrumpido`, libera el documento y escribe una
+   actividad con el motivo. **Es la misma peticion**: no hay ninguna tarea de fondo que
+   corra antes.
+4. El usuario ve el documento con el estado "interrumpido" y la opcion de **reintentar**.
 5. Al reintentar, se crea un **trabajo nuevo** (tipo `analisis`) que apunta al mismo
    documento. El trabajo anterior se conserva como historial.
 
@@ -237,9 +254,9 @@ exito: el documento sigue sin resultado.
 | SP-05 | El cliente **no tiene permiso** para analizar | 403 | 403 |
 | SP-06 | Ya existe un trabajo **abierto** para el mismo documento | 409. Un documento no se analiza dos veces a la vez | 409 |
 | SP-07 | El cliente **pierde la conexion** a mitad del analisis | El analisis local continua. Los reportes fallan, se reintentan al volver la conexion y el trabajo queda `interrumpido` si no se recupera dentro del margen | 503 en el reporte |
-| SP-08 | La **pestana se cierra** a mitad | El trabajo queda `en_proceso` sin latido. La tarea de mantenimiento lo marca `interrumpido` | HU-08 (mecanismo) |
+| SP-08 | La **pestana se cierra** a mitad | El trabajo queda `en_proceso` sin latido. La expiracion perezosa lo marca `interrumpido` en la siguiente lectura | HU-08 (mecanismo) |
 | SP-09 | El navegador **se queda sin memoria** o el Worker muere | Se reporta `error` con el motivo. El documento queda en `error` y se puede reintentar | 200 con `estado = error` |
-| SP-10 | La **tarea de mantenimiento** no se ejecuta (plan gratuito en pausa) | Los trabajos quedan en `en_proceso` hasta que la tarea corra. Se documenta como limitacion operativa, no como bug del usuario | comportamiento diferido |
+| SP-10 | **Nadie consulta** el trabajo abandonado | El trabajo sigue en `en_proceso` hasta que alguien lo mire. Es inocuo: el documento solo se libera cuando el usuario vuelve | comportamiento diferido |
 | SP-11 | El cliente reporta una **bitacora enorme** (miles de filas) | 422 por el limite de actividades por reporte. El backend no acepta lo que sea | 422 |
 | SP-12 | El **reporte tiene un latido con fecha futura** | Se ignora el latido para la deteccion de abandono (el reloj del cliente no es confiable), pero se acepta el resto del reporte | 200 |
 
@@ -255,7 +272,7 @@ exito: el documento sigue sin resultado.
 | EC-02 | El documento tiene **0 bloques** | Error antes de abrir el trabajo. No hay nada que reportar |
 | EC-03 | El total de bloques es **1** | `floor(100/1) = 100` puntos por bloque. La barra avanza de golpe. Correcto |
 | EC-04 | La fraccion de fracciones **suma mas de 100** | El calculo se normaliza: la suma real de las fracciones es la que se usa. No hay hardcodeo de numeros sueltos |
-| EC-05 | Un trabajo queda en `en_proceso` **sin ninguna actividad** | Es valido: el trabajo se creo pero el Worker no arranco. La tarea de mantenimiento lo marca `interrumpido` |
+| EC-05 | Un trabajo queda en `en_proceso` **sin ninguna actividad** | Es valido: el trabajo se creo pero el Worker no arranco. La expiracion perezosa lo marca `interrumpido` |
 | EC-06 | El cliente reporta **muchas actividades a la vez** | Se insertan todas en una sola transaccion. O se guardan todas o ninguna |
 | EC-07 | El trabajo **se reintenta tres veces** | Al cuarto intento se deja de ofrecer el reintento automatico. Un bucle de reintentos sobre un documento problematico es un fallo del cliente, no del sistema |
 | EC-08 | Dos pestanas del **mismo usuario** con el mismo documento | La segunda recibe 409 en la apertura del trabajo. El documento no se procesa dos veces |
@@ -306,9 +323,10 @@ exito: el documento sigue sin resultado.
 
 ### CA-05: El abandono se detecta sin intervencion
 **Dado** un trabajo en `en_proceso` sin latido por mas de 2 minutos
-**Cuando** corre la tarea de mantenimiento
+**Cuando** alguien consulta el trabajo o el documento
 **Entonces** el trabajo queda en `interrumpido`
 **Y** el documento queda disponible para reintentar
+**Y** la operacion no depende de ninguna tarea de fondo ni de un `cron`
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-06: Reintentar crea un trabajo nuevo

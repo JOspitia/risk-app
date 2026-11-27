@@ -1067,12 +1067,17 @@ trabajo se queda en `en_proceso` para siempre. Se resuelve con dos mecanismos:
 
 - El cliente envia un **latido** con cada reporte de progreso. Un trabajo sin latido por mas
   de N minutos se considera abandonado.
-- Una tarea de mantenimiento (un `cron` de Vercel, o el mismo endpoint de salud con un
-  disparador) marca los trabajos sin latido como `interrumpido`, liberando el documento para
-  poder reintentarse.
+- La **expiracion perezosa** marca los trabajos sin latido como `interrumpido` cuando
+  alguien los mira (ADR-24). No hay un proceso que vaya a buscarlos.
 
 Sin esto, un analisis abandonado deja el documento en un limbo que el usuario ve como "en
 proceso" para siempre.
+
+**Por que no hay un `cron`.** En Vercel Hobby los Cron Jobs corren **una vez al dia**, y
+una expresion mas frecuente **falla el despliegue**. Una tarea cada 2 minutos no es
+configurable en el plan que usa el primer despliegue (ADR-21). La expiracion perezosa
+resuelve el mismo problema sin depender del plan: el trabajo se limpia la primera vez que
+alguien lo mira, que es justo cuando importa.
 
 **Cola en el servidor: para el futuro, no para la v1.** `[PROPUESTO]` Si se anade un modo
 hospedado, la cola entra como `pgmq` dentro de Postgres: el mensaje lleva `trabajo_id` y
@@ -1382,10 +1387,11 @@ Por que en la base y no en Redis, cuando llegue:
 El **worker**, en cambio, si necesita un proceso que viva: por eso va en un contenedor
 (nivel 4), no en Vercel Functions.
 
-Lo que si hay en la v1 es una **tarea de mantenimiento** para los trabajos abandonados (la
-pestana se cerro a mitad del analisis): un `cron` de Vercel la dispara, y marca los
-trabajos sin latido como `interrumpido`. Es barata, y sin ella el usuario ve documentos
-atascados en "en proceso" para siempre.
+Lo que si hay en la v1 es la **expiracion perezosa** de los trabajos abandonados (la
+pestana se cerro a mitad del analisis): cuando alguien consulta un trabajo, un documento o
+la lista de trabajos, los que no han reportado latido en mas de 2 minutos se marcan
+`interrumpido` en la misma operacion. Es un `update` barato, indexado, y no depende de que
+haya un plan de Vercel con cron frecuente. Ver ADR-24.
 
 ### 9.5 Perfil de despliegue: la demo gratuita
 
@@ -1458,7 +1464,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-21 | El primer despliegue usa planes gratuitos (Vercel Hobby + Supabase Free) | 2026-11-27 | Aceptada | Permite mostrar el producto sin gasto. Se documentan las tres limitaciones del plan gratuito (pausa por inactividad, SMTP de 2 correos/hora, uso no comercial en Hobby) para que se anticipen y no se descubran en vivo |
 | ADR-22 | Retencion por defecto: los documentos se conservan hasta que el dueno o un admin los borra, sin expiracion automatica | 2026-11-27 | Aceptada | Es el supuesto que menos impone para la demo. Se cambia por decision del cliente cuando se conozca su politica y su base legal. **No es una politica de retencion final** |
 | ADR-23 | El motor LLM, el almacenamiento y el despliegue son intercambiables por diseño; un proveedor de modelos hospedado exige un ADR propio | 2026-11-27 | Aceptada | El cliente puede tener un contrato con un proveedor de modelos, o su propio S3 o SFTP. Los puertos lo permiten; lo que cambia es el adaptador. Un motor hospedado cambia la postura de privacidad, asi que no es un default: se activa explicitamente y queda registrado |
-| ADR-24 | El trabajo abandonado se marca `interrumpido` por una tarea de mantenimiento que detecta la falta de latido | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Cierra HU-08 |
+| ADR-24 | El trabajo abandonado se marca `interrumpido` por **expiracion perezosa**, no por un `cron` | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Y no puede depender de un `cron` frecuente: Vercel Hobby corre los cron una vez al dia y una expresion cada 2 minutos falla el despliegue. La expiracion perezosa marca el trabajo la primera vez que alguien lo mira, que es cuando importa. Cierra HU-08 |
 | ADR-25 | El reanálisis conserva el análisis anterior en una tabla de historial y actualiza el vigente | 2026-11-27 | Aceptada | "No sobrescribir" es una promesa vacia si no hay donde conservar lo anterior. La tabla aparte evita relajar el `unique` de `analisis_documentos` y deja el historial con su propia forma. Cierra HU-10 y la parte de DP-13 que faltaba |
 | ADR-26 | El reanálisis se pide por un endpoint propio y el archivo viaja del bucket privado al navegador, nunca por el backend | 2026-11-27 | Aceptada | Reutilizar `POST /documentos` para el reanálisis mezclaría dos operaciones con permisos y precondiciones distintas. Y el PDF no puede pasar por la funcion: el cuerpo de peticion llega a 4.5 MB. Cierra HU-10 |
 | ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
