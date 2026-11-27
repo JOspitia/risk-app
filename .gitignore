@@ -9,12 +9,26 @@ venv/
 .mypy_cache/
 .coverage
 htmlcov/
+coverage.xml
 
 # Node / frontend
 node_modules/
 dist/
 .vite/
 *.tsbuildinfo
+coverage/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Vercel
+.vercel/
+
+# Documentos de trabajo temporales
+*.tmp
+*.tmp.md
+*.mdtmp
 
 # Entorno: nunca se versiona un secreto
 .env
