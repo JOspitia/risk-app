@@ -50,7 +50,7 @@ ejecuta en el navegador del usuario.
 | Area | Estado |
 |---|---|
 | Especificacion funcional | Completa. 25 RF + 9 RNF |
-| Decisiones de arquitectura | Completas. 27 ADR |
+| Decisiones de arquitectura | Completas. 28 ADR |
 | Decisiones de producto | Completas. 15 de 15 cerradas |
 | Historias de usuario | **10 de 10** escritas |
 | Metodo y contratos de codigo | Completo. `SKILL.md` |
@@ -66,11 +66,12 @@ ejecuta en el navegador del usuario.
 
 | Componente | Version | Verificado |
 |---|---|---|
-| Python | 3.15.2 | 2026-11-27 |
+| Python | 3.14.10 | 2026-11-27 |
 | FastAPI | 0.165.0 | 2026-11-27 |
 | Vue | 3.5.46 | 2026-11-27 |
 | Vite | 8.4.0 | 2026-11-27 |
-| PostgreSQL | 16 (Supabase) | - |
+| TypeScript | 6.0.3 | 2026-11-27 |
+| PostgreSQL | 17 (Supabase) | 2026-11-27 |
 | Supabase | Auth + Postgres + RLS + PostgREST + Storage | - |
 | LLM | WebLLM en el navegador (Qwen3, Llama 3.2, Phi-4-mini, Gemma) | - |
 
@@ -206,7 +207,7 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `README.md` | Este brief | Primero, siempre |
 | `AGENTS.md` | Reglas del repositorio y orden de lectura | Antes de tocar nada |
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones | Para entender el **que** |
-| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **27 ADR** | Para entender el **como** |
+| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **28 ADR** | Para entender el **como** |
 | `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-13** | Para saber que esta abierto |
 | `docs/HU/INDICE.md` | Indice de historias de usuario y grafo de dependencias | Para planificar trabajo |
 | `docs/HU/HU-0*.md` | Historias de usuario completas | Antes de implementar una funcionalidad |

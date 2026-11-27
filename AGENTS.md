@@ -154,17 +154,23 @@ seccion 1.0 (ADR-27). Lo que se ve al retomar el proyecto:
 
 | Componente | Version | Verificado |
 |---|---|---|
-| Python | 3.15.2 | 2026-11-27 |
+| Python | 3.14.10 | 2026-11-27 |
 | FastAPI | 0.165.0 | 2026-11-27 |
 | supabase (SDK de Python) | 2.34.1 | 2026-11-27 |
 | Vue | 3.5.46 | 2026-11-27 |
 | Vite | 8.4.0 | 2026-11-27 |
-| TypeScript | 7.0.2 | 2026-11-27 |
+| TypeScript | 6.0.3 | 2026-11-27 |
+| vue-tsc | 3.3.14 | 2026-11-27 |
 | Node.js | 24 o 26 (LTS) | 2026-11-27 |
 | @supabase/supabase-js | 2.119.2 | 2026-11-27 |
 | @mlc-ai/web-llm | 0.2.89 | 2026-11-27 |
 | Supabase CLI | 3.4.0 | 2026-11-27 |
 | PostgreSQL | 17 (via Supabase) | 2026-11-27 |
+
+> **Python 3.14, no 3.15, y TypeScript 6, no 7.** No es que esten mal: es que Vercel
+> Functions no ofrece Python 3.15 y TypeScript 7 no expone la API que necesita `vue-tsc`.
+> El pin sigue al entorno de despliegue real. El detalle esta en `ARQUITECTURA.md` secciones
+> 1.0.1 y 1.0.2 (ADR-28).
 
 Si al retomar el proyecto una de estas versiones ya no es la actual, verificar contra los
 registros oficiales (PyPI, npm, nodejs.org) y **registrar el cambio como ADR** antes de

@@ -23,12 +23,13 @@ Verificadas contra los registros oficiales (PyPI, npm y nodejs.org) el **2026-11
 
 | Componente | Version | Publicada | Nota |
 |---|---|---|---|
-| Python | **3.15.2** | 2026-10-25 | Estable. El motor de inferencia corre en el navegador, no aqui |
+| Python | **3.14.10** | 2026-10-07 | **No 3.15.** Vercel Functions no ofrece 3.15 todavia (ver 1.0.1) |
 | FastAPI | **0.165.0** | 2026-11-18 | `requires_python >= 3.11`; declara `Python :: 3.15` |
 | supabase (SDK de Python) | **2.34.1** | 2026-11-06 | `requires_python >= 3.11` (dejo 3.9 y 3.10 en 2.34.0) |
 | Vue | **3.5.46** | 2026-11 | Rama 3.5, parche activo |
 | Vite | **8.4.0** | 2026-11-26 | Empaquetador **Rolldown** (`rolldown ~1.3.2`) |
-| TypeScript | **7.0.2** | 2026-07-08 | Port nativo (Go). La serie 5.9 sigue disponible si hace falta |
+| TypeScript | **6.0.3** | 2026-10 | **No 7.x.** TypeScript 7 no expone API programatica estable y rompe `vue-tsc` (ver 1.0.2) |
+| vue-tsc | **3.3.14** | 2026-10 | Verificacion de tipos de los `.vue`. Requiere TypeScript 6 |
 | Node.js | **24 o 26** (LTS) | - | El piso real lo impone `@supabase/supabase-js`: `>= 22.0.0` |
 | @supabase/supabase-js | **2.119.2** | 2026-11-19 | `engines.node >= 22.0.0` |
 | @mlc-ai/web-llm | **0.2.89** | 2026-11-17 | 175 modelos en el catalogo. Ver 6.2 |
@@ -37,8 +38,48 @@ Verificadas contra los registros oficiales (PyPI, npm y nodejs.org) el **2026-11
 | PostgREST | **14** | - | La Data API de Supabase |
 | Supabase (plan) | **Free** | - | Primer despliegue, ADR-21. Sube a Pro si el demo es un trabajo facturado |
 
+### 1.0.1 Por que Python 3.14 y no 3.15
+
+`[DECIDIDO]` **Python 3.14.10.** Vercel Functions ofrece **3.12 (por defecto), 3.13 y 3.14**.
+La version 3.15 todavia no esta disponible en el runtime de Vercel: fijar 3.15.2 en el
+`pyproject.toml` seria una promesa que el despliegue no puede cumplir, y el error
+apareceria en el primer `vercel deploy`, no en la revision.
+
+Python 3.15 no esta *prohibido*: es la version mas nueva y FastAPI ya la declara soportada.
+Simplemente **no se puede desplegar ahi todavia**. Si el cliente contrata un despliegue
+propio (Docker, ADR-21), ahi si se puede subir a 3.15. El pin del repositorio sigue el
+entorno de despliegue real, no el mas nuevo que exista.
+
+### 1.0.2 Por que TypeScript 6 y no 7
+
+`[DECIDIDO]` **TypeScript 6.0.3 con `vue-tsc` 3.3.14.** TypeScript 7 es el port nativo en
+Go y ya es `latest` en npm, pero **no expone la API programatica de JavaScript** que
+necesitan las herramientas del ecosistema:
+
+- `vue-tsc` la necesita para verificar los tipos de los `.vue` desde la linea de comandos.
+- `typescript-eslint` declara `>=4.8.4 <6.1.0` y **rechaza** 7.0.
+- Vue Language Tools tiene la misma dependencia.
+
+El proyecto usa componentes de archivo unico de Vue 3.5, asi que `vue-tsc` no es
+opcional: sin el, los `.vue` no se verifican.
+
+La combinacion que Microsoft publica para este caso es instalar las dos lineas con alias:
+
+```jsonc
+{
+  "devDependencies": {
+    "typescript": "npm:@typescript/typescript6@^6.0.2",   // API de JS: vue-tsc, eslint, tests
+    "@typescript/native": "npm:typescript@^7.0.2"          // compilador nativo: build y watch
+  }
+}
+```
+
+En la v1 se usa **solo TypeScript 6**: una dependencia mas, un `tsc` mas lento, y nada
+ganado. La linea 7 entra cuando el proyecto tenga volumen de build que lo justifique o
+cuando `vue-tsc` lo soporte de forma estable.
+
 **El SDK de Python va en 2.34.1, no en la ultima de la serie 2.** La 2.34.1 es la que
-declara `requires_python >= 3.11` y por tanto admite 3.15 sin problema.
+declara `requires_python >= 3.11` y por tanto admite 3.14 sin problema.
 
 **El CLI tiene dos ramas vivas.** `latest` es la v3 (3.4.0) y la v2 sigue viva bajo el
 dist-tag `v2.stable` (2.122.1). Se usa la **v3**; la v2 queda anotada por si una
@@ -86,7 +127,7 @@ dependencia que no justifique su peso se rechaza en la revision.
 | Categoria | Eleccion | Nota |
 |---|---|---|
 | Framework | Vue 3.5.46 (`<script setup>`, Composition API) | |
-| Build | Vite 8.4.0 + TypeScript 7.0.2 | Empaquetador Rolldown |
+| Build | Vite 8.4.0 + TypeScript 6.0.3 | Empaquetador Rolldown. `vue-tsc` 3.3.14 para los `.vue` |
 | Estado | Pinia | Estado de sesion, configuracion del motor, documentos |
 | Enrutado | Vue Router | |
 | Estilos | Tailwind CSS | Coherente con la version original del documento |
@@ -1346,7 +1387,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 
 | ID | Decision | Fecha | Estado | Motivo |
 |---|---|---|---|---|
-| ADR-01 | Python 3.15.2 + FastAPI 0.165.0 + Vue 3.5.46 | 2026-11-27 | Aceptada | Combinacion actual y estable; versiones verificadas contra PyPI, npm y python.org |
+| ADR-01 | Python 3.14.10 + FastAPI 0.165.0 + Vue 3.5.46 | 2026-11-27 | Aceptada | Combinacion actual y estable; versiones verificadas contra PyPI, npm, python.org y los runtimes de Vercel. El pin exacto esta en la seccion 1.0 (ADR-27 y ADR-28) |
 | ADR-02 | Nucleo hexagonal (puertos y adaptadores) | 2026-11-27 | Aceptada | Tres adaptadores de salida intercambiables y dos modos de ejecucion del pipeline. Decidirlo antes de escribir codigo, porque revertirlo es caro |
 | ADR-03 | Frontend Vue 3.5.46 + Vite + TypeScript + Pinia | 2026-11-27 | Aceptada | Correccion explicita del React del documento original |
 | ADR-04 | Acceso a datos por HTTP (PostgREST) en vez de TCP a Postgres | 2026-11-27 | Aceptada | Hace el backend stateless y portable a Cloudflare Workers sin cambios. La atomicidad se resuelve con funciones de Postgres (RPC) |
@@ -1372,7 +1413,8 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-24 | El trabajo abandonado se marca `interrumpido` por una tarea de mantenimiento que detecta la falta de latido | 2026-11-27 | Aceptada | Sin un estado que distinga "abandonado" de "en curso", un documento queda en un limbo que el usuario ve como "en proceso" para siempre. La deteccion no puede estar en el cliente: el cliente que cerro la pestana no puede marcar nada. Cierra HU-08 |
 | ADR-25 | El reanálisis conserva el análisis anterior en una tabla de historial y actualiza el vigente | 2026-11-27 | Aceptada | "No sobrescribir" es una promesa vacia si no hay donde conservar lo anterior. La tabla aparte evita relajar el `unique` de `analisis_documentos` y deja el historial con su propia forma. Cierra HU-10 y la parte de DP-13 que faltaba |
 | ADR-26 | El reanálisis se pide por un endpoint propio y el archivo viaja del bucket privado al navegador, nunca por el backend | 2026-11-27 | Aceptada | Reutilizar `POST /documentos` para el reanálisis mezclaría dos operaciones con permisos y precondiciones distintas. Y el PDF no puede pasar por la funcion: el cuerpo de peticion llega a 4.5 MB. Cierra HU-10 |
-| ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Python 3.15.2 lleva un mes en el mercado y el ecosistema de Supabase acaba de cambiar de rama en varios puntos. Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
+| ADR-27 | Las versiones del stack se fijan con pin exacto, verificadas contra los registros oficiales | 2026-11-27 | Aceptada | Un rango abierto ("FastAPI ^0.165") se rompe en produccion, no en el `pyproject.toml`. La tabla de la seccion 1.0 es la unica fuente: si una version cambia, se actualiza la tabla **y** este ADR en el mismo commit |
+| ADR-28 | El pin del stack se ajusta a lo que la plataforma de despliegue soporta, no a la ultima version publicada | 2026-11-27 | Aceptada | Python 3.15.2 y TypeScript 7.0.2 son las ultimas versiones de sus respectivos registros, pero **Vercel Functions no ofrece Python 3.15** y **TypeScript 7 rompe `vue-tsc`**. Fijar lo mas nuevo que existe es una promesa que el despliegue no puede cumplir: el error aparece en el primer deploy, no en la revision. Ver 1.0.1 y 1.0.2 |
 
 ### 10.1 Como se registra una decision nueva
 

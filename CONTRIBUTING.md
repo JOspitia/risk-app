@@ -102,7 +102,7 @@ feat(auth): valida el JWT de Supabase en cada peticion
 fix(permisos): deniega por defecto cuando el permiso no esta en la matriz
 refactor(chunking): deriva el tamano de bloque de la ventana del modelo
 test(documentos): cubre el ciclo de vida completo contra Supabase real
-build: fija Python 3.15.2 y FastAPI 0.165.0
+build: fija Python 3.14.10 y FastAPI 0.165.0
 chore: excluye la documentacion generada del control de versiones
 ```
 
