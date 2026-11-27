@@ -40,6 +40,15 @@ Antes de escribir o modificar codigo:
 - Cerrar una pregunta abierta implica actualizarla en `DECISIONES-PENDIENTES.md` **y** el
   ADR en el mismo commit.
 
+### 1.4 Commits y pull requests
+
+- Los mensajes siguen **Conventional Commits** con el contenido en espanol:
+  `<tipo>(<ámbito>): <descripcion>`. La guia completa esta en `CONTRIBUTING.md`.
+- Un commit, un objetivo. Si el mensaje necesita una "y", son dos commits.
+- `main` solo recibe cambios que pasaron los gates de `CHECKLIST.md`. El trabajo ocurre en
+  una rama y llega por pull request.
+- Cada commit que implemente un ADR o una HU lo referencia en el pie del mensaje.
+
 ---
 
 ## 2. Reglas que no se negocian
@@ -182,4 +191,5 @@ el cambio como ADR** antes de actualizar el codigo.
 | `docs/HU/` | Historias de usuario: camino feliz, caminos de error y criterios de aceptacion |
 | `SKILL.md` | Metodo y contratos de codigo (skill instalable) |
 | `CHECKLIST.md` | Gates de verificacion |
+| `CONTRIBUTING.md` | Convencion de commits y pull requests |
 | `docs/legacy/` | Documentos originales sin procesar. No se editan |
