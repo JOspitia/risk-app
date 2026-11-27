@@ -1161,9 +1161,8 @@ cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la 
 | Metodo | Ruta | Descripcion | Auth |
 |---|---|---|---|
 | GET | `/health` | Sonda de vida y estado de la base | No |
-| POST | `/api/v1/auth/login` | Inicio de sesion (delega en Supabase Auth) | No |
-| POST | `/api/v1/auth/logout` | Cierre de sesion | Si |
-| GET | `/api/v1/auth/me` | Usuario, rol y organizacion actuales | Si |
+| POST | `/api/v1/auth/logout` | Cierra la sesion y revoca el `session_id` de inmediato | Si |
+| GET | `/api/v1/auth/me` | Usuario, rol, organizacion y permisos efectivos | Si |
 | GET | `/api/v1/configuracion/motor` | Configuracion efectiva del motor | Si |
 | PUT | `/api/v1/configuracion/motor` | Guarda configuracion (usuario u organizacion) | Si |
 | GET | `/api/v1/plantillas` | Lista plantillas de extraccion activas | Si |
@@ -1268,11 +1267,12 @@ Variables de entorno obligatorias:
 
 | Variable | Default | Nota |
 |---|---|---|
-| `SUPABASE_URL` | ninguno | |
+| `SUPABASE_URL` | ninguno | Tambien define el emisor del JWT: `{SUPABASE_URL}/auth/v1` |
 | `SUPABASE_ANON_KEY` | ninguno | Llave publica para el frontend |
 | `SUPABASE_SERVICE_ROLE_KEY` | ninguno | Solo backend. Nunca en el frontend |
-| `SUPABASE_JWT_SECRET` | ninguno | Verificacion del JWT de Supabase. Minimo 32 caracteres |
-| `DATABASE_URL` | ninguno | Solo para Alembic en desarrollo |
+| `SUPABASE_JWT_SECRET` | ninguno | Solo para proyectos con claves simetricas (HS256). Los proyectos nuevos usan JWKS |
+| `SUPABASE_JWKS_URL` | `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` | Claves publicas para validar tokens asimetricos (RS256/ES256) |
+| `DATABASE_URL` | ninguno | Solo para el script de validacion de migraciones en desarrollo |
 | `MAX_UPLOAD_MB` | `50` | Solo aplica a partir de la v2 |
 | `CORS_ORIGINS` | ninguno | Lista separada por comas |
 | `LOG_LEVEL` | `INFO` | |

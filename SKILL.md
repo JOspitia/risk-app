@@ -699,17 +699,21 @@ tiempo: esta disenado para subir.
 
 ### 5.2 Autenticacion con Supabase Auth — DECIDIDO
 
-`[DECIDIDO]` **Supabase Auth emite el JWT; el backend lo valida.** ADR-05.
+`[DECIDIDO]` **Supabase Auth emite el JWT; el backend lo valida.** ADR-05, ADR-31.
 
 El backend valida el JWT emitido por Supabase:
 
 ```
 1. Extraer el bearer token del header Authorization.
-2. Verificar la firma contra la clave publica del proyecto (o el JWKS).
-3. Verificar exp, aud e iss.
-4. Resolver el perfil (rol, organizacion_id) desde la tabla perfiles.
-5. Construir el AuditContext con usuario_id, rol y organizacion_id.
-6. Si algo falla -> contexto anonimo. Los endpoints protegidos llaman a un guard que
+2. Verificar la firma. La clave publica sale del JWKS del proyecto
+   ({SUPABASE_URL}/auth/v1/.well-known/jwks.json). Los proyectos antiguos usan HS256
+   con SUPABASE_JWT_SECRET.
+3. Verificar exp, aud e iss. El iss esperado es {SUPABASE_URL}/auth/v1, NO una cadena
+   inventada por la aplicacion.
+4. Verificar que el session_id no este revocado (ver revocacion, mas abajo).
+5. Resolver el perfil (rol, organizacion_id) desde la tabla perfiles.
+6. Construir el AuditContext con usuario_id, rol y organizacion_id.
+7. Si algo falla -> contexto anonimo. Los endpoints protegidos llaman a un guard que
    levanta 401.
 ```
 
@@ -720,10 +724,37 @@ El backend valida el JWT emitido por Supabase:
   queda solo en el codigo de aplicacion, que es exactamente donde no se quiere.
 - El `service_role` solo se usa en el worker, y aun ahi la consulta se acota
   explicitamente por `usuario_id` u `organizacion_id`.
-- El frontend usa el SDK de Supabase para el login. El backend no emite tokens: **no hay
-  endpoint propio de emision**, solo de delegacion y de cierre de sesion.
+- El frontend usa el SDK de Supabase para el login. El backend **no emite tokens**: no hay
+  ningun endpoint de emision. `signInWithPassword` se llama **directo** al SDK, y
+  `POST /api/v1/auth/login` **no existe**. Si aparece en un router, es un error.
 
-### 5.3 JWT con sesiones revocables — FUERA DE ALCANCE
+### 5.3 Revocacion de sesion — DECIDIDO
+
+`[DECIDIDO]` **El cierre de sesion invalida el token de inmediato, no al expirar.** ADR-31.
+
+Un JWT es stateless: verificar firma, `exp`, `aud` e `iss` no detecta que la sesion se
+cerró. En Supabase Auth, `signOut()` revoca el *refresh token*, pero el *access token*
+sigue siendo criptograficamente valido hasta su `exp` (por defecto una hora). Un criterio
+de aceptacion que exija "401 de inmediato" no se cumple solo con validacion local.
+
+**Como se resuelve.**
+
+1. El access token de Supabase lleva un claim `session_id`.
+2. `POST /api/v1/auth/logout` recibe el token, extrae su `session_id` y lo inserta en
+   `sesiones_revocadas (session_id, revocado_en, expira_en)`.
+3. El filtro de autenticacion consulta esa tabla en cada peticion: si el `session_id` del
+   token esta revocado y su `expira_en` no ha pasado, la peticion es **401**.
+4. `expira_en` es el `exp` del propio token. La fila se puede borrar cuando pasa esa
+   fecha, y **deja de ser un registro de sesiones**: solo guarda `session_id`, nunca el token.
+
+El costo es una consulta local indexada por peticion. La alternativa —validar la sesion
+contra el servidor de Auth en cada peticion— es una llamada de red por peticion, y no se
+justifica para este volumen.
+
+**El registro de revocacion es append-only.** Nunca se borra una fila para "desrevocar" una
+sesion: se espera a que expire.
+
+### 5.4 Sesiones revocables propias — FUERA DE ALCANCE
 
 `[DECIDIDO]` No aplica: Supabase Auth ya gestiona la revocacion de sesiones. Se conserva la
 especificacion por si la decision se revierte.

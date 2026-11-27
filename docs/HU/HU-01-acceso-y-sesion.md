@@ -78,7 +78,8 @@ Nada. Es la primera en construir.
 | Proyecto en Supabase | Con Auth habilitado |
 | Politica RLS en `perfiles` | El backend lee el perfil con el JWT del usuario |
 | Tabla `perfiles` | Debe existir y tener al menos una fila por usuario |
-| Variable `SUPABASE_JWT_SECRET` | Para verificar la firma del token |
+| `SUPABASE_JWT_SECRET` | Para verificar la firma del token. **Solo en proyectos con claves simetricas** |
+| Tabla `sesiones_revocadas` | Para que el cierre de sesion invalide el token de inmediato (ADR-31) |
 
 ---
 
@@ -88,11 +89,22 @@ Nada. Es la primera en construir.
 |---|---|---|---|---|
 | `SUPABASE_URL` | local | por definir | por definir | — (obligatoria) |
 | `SUPABASE_ANON_KEY` | local | por definir | por definir | — (obligatoria) |
-| `SUPABASE_JWT_SECRET` | local | por definir | por definir | — (obligatoria, 32+ chars) |
+| `SUPABASE_JWT_SECRET` | local | por definir | por definir | — (obligatoria, 32+ chars. Solo con claves simetricas) |
+| `SUPABASE_JWKS_URL` | `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` | por definir | por definir | — (obligatoria con claves asimetricas) |
 | `SUPABASE_SERVICE_ROLE_KEY` | local | por definir | por definir | — (obligatoria, solo backend) |
 | `CORS_ORIGINS` | `http://localhost:5173` | por definir | por definir | — (obligatoria) |
-| `JWT_ISSUER` | `risk-app` | `risk-app` | `risk-app` | `risk-app` |
+| `JWT_ISSUER` | `{SUPABASE_URL}/auth/v1` | `{SUPABASE_URL}/auth/v1` | `{SUPABASE_URL}/auth/v1` | `{SUPABASE_URL}/auth/v1` |
 | `JWT_AUDIENCE` | `authenticated` | `authenticated` | `authenticated` | `authenticated` |
+
+> **`JWT_ISSUER` no es una cadena de la aplicacion.** El emisor real de un token emitido
+> por Supabase Auth es `{SUPABASE_URL}/auth/v1`. Si el middleware exige `"risk-app"`,
+> rechaza **todos** los tokens reales con 401. El valor se deriva de `SUPABASE_URL`, no se
+> escribe a mano.
+>
+> **La firma se verifica con las claves publicas del proyecto.** Los proyectos nuevos de
+> Supabase usan claves **asimetricas** (JWKS en `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`,
+> RS256 o ES256). `SUPABASE_JWT_SECRET` (HS256) es para proyectos antiguos. El backend
+> admite las dos: la variable de entorno decide cual aplica.
 
 **No hay TTL propio de sesion.** La duracion la define Supabase Auth. El backend no la
 gestiona, solo la verifica.
@@ -317,7 +329,9 @@ no un numero
 **Dado** un usuario autenticado
 **Cuando** cierra sesion
 **Entonces** el backend responde 200 y registra el evento en auditoria
-**Y** el token anterior **no vuelve a servir** en la peticion siguiente
+**Y** el `session_id` del token queda registrado en `sesiones_revocadas`
+**Y** el token anterior **no vuelve a servir** en la peticion siguiente, sin esperar la
+expiracion natural
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-12: Cambio de contrasena obligatorio
