@@ -107,8 +107,7 @@ Las reglas finas viven en `SKILL.md`. Lo no negociable en resumen:
 | Transacciones | La abre el caso de uso. Una transaccion, un commit |
 | Secretos | Variables de entorno. El arranque falla si falta una obligatoria |
 | Validacion | La salida del LLM se valida contra esquema antes de persistir |
-| Tests | Un endpoint no esta terminado hasta que tiene una prueba que falla si el endpoint |
-| esta mal |
+| Tests | Un endpoint no esta terminado hasta que tiene una prueba que falla si el endpoint esta mal |
 
 ---
 
