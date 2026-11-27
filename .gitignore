@@ -26,3 +26,9 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# Documentacion GENERADA (la fuente .md dentro de docs/ SI se versiona).
+# Se ignoran unicamente los artefactos que produce el generador.
+docs/_build/
+docs/_site/
+docs/site/

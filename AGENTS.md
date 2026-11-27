@@ -17,7 +17,10 @@ Antes de escribir o modificar codigo:
    datos.
 3. `docs/DECISIONES-PENDIENTES.md` — que falta definir y que supuesto se esta usando.
 4. `SKILL.md` — los contratos de codigo. Es normativa, no referencia opcional.
-5. `CHECKLIST.md` — los gates que hay que pasar.
+5. `docs/HU/` — la historia de usuario de la funcionalidad que se va a tocar. Ahi esta el
+   camino feliz, los caminos de error y los **criterios de aceptacion** que se traducen en
+   pruebas.
+6. `CHECKLIST.md` — los gates que hay que pasar.
 
 ### 1.2 Regla de la informacion faltante
 
@@ -176,6 +179,7 @@ el cambio como ADR** antes de actualizar el codigo.
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones |
 | `docs/ARQUITECTURA.md` | Stack, arquitectura, carpetas, modelo de datos, ADR |
 | `docs/DECISIONES-PENDIENTES.md` | Preguntas abiertas con impacto y supuestos |
+| `docs/HU/` | Historias de usuario: camino feliz, caminos de error y criterios de aceptacion |
 | `SKILL.md` | Metodo y contratos de codigo (skill instalable) |
 | `CHECKLIST.md` | Gates de verificacion |
 | `docs/legacy/` | Documentos originales sin procesar. No se editan |

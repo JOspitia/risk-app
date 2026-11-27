@@ -1,0 +1,107 @@
+# Historias de usuario — Risk-app
+
+> Historias de usuario del proyecto. Cada una describe **un objetivo del usuario**, el camino
+> feliz, los caminos de error y los **criterios de aceptacion** verificables.
+>
+> Que no duplican la especificacion tecnica: eso vive en [`../ARQUITECTURA.md`](../ARQUITECTURA.md)
+> (23 ADR) y en [`../../SKILL.md`](../../SKILL.md) (los 9 contratos de codigo). Aqui va el
+> **valor para el usuario** y el **como se comprueba que esta listo**.
+
+- **Estado:** vigente
+- **Ultima actualizacion:** 2026-11-27
+- **Formato:** heredado de `prueba-tecnica/documentacion/` y `Serviklapp/docs/hus/`, unificado
+  en el esqueleto de 10 secciones que ambos proyectos ya usaban.
+
+---
+
+## 1. Que aporta una HU aqui, y que no
+
+| Ya existe | Lo que aporta la HU |
+|---|---|
+| Requisitos funcionales (RF-01 a RF-25) en `CONTEXTO.md` | El **recorrido** del usuario, no la lista de capacidades |
+| 23 ADR con el "por que" de cada decision tecnica | Los **caminos de error**: que pasa cuando algo falla |
+| Los 9 contratos de codigo del `SKILL.md` | Los **criterios de aceptacion** en formato PASS / FAIL |
+| 11 gates de verificacion en `CHECKLIST.md` | El **alcance**: que queda explicitamente fuera |
+
+**Regla:** una HU no introduce datos de negocio que no existan. Si un campo o una regla no
+esta decidida, va marcado `[PENDIENTE]` y se anota en `DECISIONES-PENDIENTES.md`. No se
+rellena con un ejemplo plausible.
+
+---
+
+## 2. Esqueleto comun
+
+Todas las HU usan las mismas 10 secciones, en este orden:
+
+1. **Titulo y descripcion** — el objetivo del usuario, en una frase.
+2. **Alcance y fuera de alcance** — que hace esta HU y que hace la siguiente.
+3. **Bloqueos y dependencias** — que tiene que existir antes, y que espera esta HU.
+4. **Variables y configuracion** — parametros, con su valor por defecto.
+5. **Suposiciones** — lo que se da por cierto mientras no se demuestre lo contrario.
+6. **Modelo de datos** — solo si la HU crea o modifica tablas.
+7. **Camino feliz principal** — paso a paso, numerado.
+8. **Caminos tristes** — errores esperados, con su codigo y su mensaje.
+9. **Casos limite y casos "estupidos"** — los bordes y los abuse.
+10. **Criterios de aceptacion** — Given / When / Then, cada uno PASS / FAIL.
+
+---
+
+## 3. Indice de historias
+
+| HU | Titulo | Cubre | Estado |
+|---|---|---|---|
+| [HU-01](HU-01-acceso-y-sesion.md) | Acceso y sesion | RF-01, ADR-05 | Escrita |
+| [HU-02](HU-02-roles-y-permisos.md) | Roles y permisos | RF-15, ADR-12, ADR-17 | Escrita |
+| HU-03 | Administracion de usuarios | RF-16, ADR-13, ADR-18 | Pendiente |
+| HU-04 | Configuracion del motor IA | RF-02, RF-20, ADR-16 | Pendiente |
+| HU-05 | Compatibilidad del equipo y descarga del modelo | RF-13, ADR-06, ADR-19 | Pendiente |
+| HU-06 | Carga y archivo de un documento | RF-03, RF-22, ADR-20 | Pendiente |
+| HU-07 | Analisis del documento (ETL + Map-Reduce) | RF-04 a RF-07, ADR-08, ADR-09, ADR-11 | Pendiente |
+| HU-08 | Seguimiento del trabajo | RF-17, RF-18, RF-21, ADR-14 | Pendiente |
+| HU-09 | Consulta de resultados y descarga | RF-09, RF-19, RF-23, ADR-15 | Pendiente |
+| HU-10 | Reanalisis con la plantilla vigente | RF-24, DP-13, ADR-20 | Pendiente |
+
+### 3.1 Orden de implementacion
+
+Las HU no son todas independientes. Este es el orden en que se pueden construir:
+
+```
+HU-01 (sesion)
+   |
+   +-> HU-02 (permisos) -----> HU-03 (admin usuarios)
+   |                                |
+   +-> HU-04 (motor) --------- HU-05 (compatibilidad)
+   |                                |
+   +-> HU-06 (carga) ----------> HU-07 (analisis) --> HU-08 (seguimiento)
+   |                                                              |
+   +--------------------------------------------------------------+--> HU-09 (consulta)
+                                                                       |
+                                                                       +--> HU-10 (reanalisis)
+```
+
+**HU-01 es la unica bloqueante de todas.** Las demas se pueden construir en cualquier
+orden siempre que sus bloqueos esten resueltos.
+
+---
+
+## 4. Como se usa una HU en el trabajo diario
+
+- **Al implementar:** la HU dice que comportamiento se espera. Los criterios de
+  aceptacion se traducen **directamente en pruebas**. Si un criterio no tiene prueba, la HU
+  no esta terminada.
+- **Al revisar:** se recorre la lista de criterios de aceptacion y se marca PASS / FAIL. Un
+  FAIL significa que la HU no esta lista.
+- **Al hacer la demo:** el camino feliz de cada HU arma el guion. Si una HU no esta, la demo
+  pierde un paso.
+- **Al integrar el frontend:** el `CHECKLIST.md` gate 8 (listo para el frontend) verifica que
+  la API cumple lo que las HU prometen.
+
+---
+
+## 5. Trazabilidad
+
+Cada HU declara que **RF** (requisito funcional) y que **ADR** (decision tecnica) cubre.
+Si un cambio de codigo invalida una HU, se actualizan los dos en el mismo commit.
+
+El indice completo de RF vive en [`../CONTEXTO.md`](../CONTEXTO.md#71-funcionales) y el de
+ADR en [`../ARQUITECTURA.md`](../ARQUITECTURA.md#10-registro-de-decisiones-adr).
