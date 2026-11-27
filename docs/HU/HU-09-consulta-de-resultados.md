@@ -5,7 +5,7 @@
 - **HU ID:** `HU-09`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-09 (listar y consultar documentos y resultados, con paginacion y filtro por ambito), RF-19 (entregar el resultado como JSON de resumenes por bloque mas el resumen ejecutivo, mapeado por DTO), RF-23 (descargar el documento mediante un enlace temporal, solo para quien tenga permiso)
+- **Cubre:** RF-09 (listar y consultar documentos y resultados, con paginacion y filtro por ambito), RF-19 (entregar el resultado como JSON de resumenes por bloque mas el resumen ejecutivo, mapeado por DTO), RF-23 (descargar el documento mediante un enlace temporal, solo para quien tenga permiso), RF-10 (aplicar las politicas de visibilidad acordadas)
 - **ADR relacionados:** ADR-15 (el resultado es un JSON de resumenes por bloque + resumen ejecutivo, entregado por DTO), ADR-17 (la visibilidad la determina el permiso), ADR-20 (el archivo esta en almacenamiento privado)
 - **Bloquea:** HU-10 (reanalisis)
 - **Bloqueado por:** HU-01 (sesion), HU-02 (permisos), HU-07 (el resultado existe)

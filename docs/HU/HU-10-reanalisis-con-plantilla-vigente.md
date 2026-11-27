@@ -6,7 +6,7 @@
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
 - **Cubre:** RF-24 (volver a analizar un documento archivado cuando cambie la plantilla, sin volver a pedir el archivo)
-- **ADR relacionados:** ADR-20 (los documentos se archivan en Supabase Storage, en un bucket privado, subidos directo desde el navegador), ADR-15 (el resultado es un JSON de resumenes por bloque + resumen ejecutivo, entregado por DTO), ADR-14 (seguimiento en la tabla `trabajos`)
+- **ADR relacionados:** ADR-20 (los documentos se archivan en Supabase Storage, en un bucket privado, subidos directo desde el navegador), ADR-25 (el resultado es un JSON de resumenes por bloque + resumen ejecutivo, entregado por DTO), ADR-26 (el reanálisis tiene su propio endpoint y el archivo viaja del bucket al navegador), ADR-14 (seguimiento en la tabla `trabajos`)
 - **Decisiones abiertas que resuelve:** DP-13 (que pasa con los resultados cuando cambia la plantilla) — cerrada: **se guardan los documentos** (ADR-20)
 - **Bloquea:** ninguna
 - **Bloqueado por:** HU-04 (configuracion del motor), HU-05 (modelo descargado), HU-06 (documento archivado), HU-07 (pipeline de analisis), HU-08 (seguimiento del trabajo)

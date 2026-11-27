@@ -5,7 +5,7 @@
 - **HU ID:** `HU-02`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-15 (sistema de roles y permisos que determina que informacion ve cada usuario)
+- **Cubre:** RF-15 (sistema de roles y permisos que determina que informacion ve cada usuario), RF-10 (aplicar las politicas de visibilidad acordadas)
 - **ADR relacionados:** ADR-12 (matriz en datos), ADR-17 (la visibilidad la decide el permiso)
 - **Bloquea:** HU-09 (consulta de resultados), y parte de HU-03
 - **Bloqueado por:** HU-01 (sesion), porque el permiso se comprueba en el caso de uso

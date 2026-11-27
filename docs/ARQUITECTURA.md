@@ -1210,6 +1210,8 @@ Eso baja el costo de operacion a casi cero y hace que todo quepa en Vercel + Sup
 - El frontend sube el PDF al endpoint de subida, que responde `202`.
 - El worker (Docker) ejecuta ETL con PyMuPDF y LLM con Ollama o vLLM.
 - El pipeline se mantiene el mismo; solo cambian los adaptadores de ETL y de LLM.
+- La cola del servidor (`pgmq`) entra, y el worker corre en un contenedor.
+- El contrato de `trabajo` **no cambia**: mismo progreso, misma bitacora, mismos estados.
 
 El caso de uso es el mismo. Esa es exactamente la prueba de que la decision hexagonal era
 la correcta.
@@ -1365,18 +1367,6 @@ Reglas:
 es el punto de entrada: los resumenes por bloque son los fragmentos que se indexan. El
 `documento_id` y el `indice` de bloque son las claves que permiten reconstruir de donde sale
 cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la pagina.
-
-### 6.9 El modo hospedado, cuando exista
-
-`[PROPUESTO]` Hoy no aplica: DP-11 cerro en **solo navegador**. Si manana se anade un modo
-hospedado (por ejemplo, para quien no tenga WebGPU), el cambio es:
-
-- El cliente sube el PDF en vez de extraerlo.
-- El worker extrae, divide, ejecuta el LLM y persiste.
-- El contrato de `trabajo` **no cambia**: mismo progreso, misma bitacora, mismos estados.
-- La cola del servidor (`pgmq`) entra, y el worker corre en un contenedor.
-
-Que el contrato no cambie es la prueba de que la decision hexagonal fue la correcta.
 
 ---
 

@@ -5,7 +5,7 @@
 - **HU ID:** `HU-07`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-04 (extraer y limpiar el texto), RF-05 (dividir en bloques con tamano derivado), RF-06 (analizar cada bloque y extraer campos validos), RF-07 (consolidar en un resumen ejecutivo)
+- **Cubre:** RF-04 (extraer y limpiar el texto), RF-05 (dividir en bloques con tamano derivado), RF-06 (analizar cada bloque y extraer campos validos), RF-07 (consolidar en un resumen ejecutivo), RF-08 (persistir documento, bloques y analisis, con insercion por lotes)
 - **ADR relacionados:** ADR-08 (tamano derivado), ADR-09 (reduce jerarquico), ADR-11 (solo documentos digitales, sin OCR), ADR-06 (motor en el navegador), ADR-15 (artefacto JSON)
 - **Bloquea:** HU-08 (seguimiento), HU-09 (consulta de resultados)
 - **Bloqueado por:** HU-04 (configuracion), HU-05 (modelo descargado), HU-06 (documento registrado)

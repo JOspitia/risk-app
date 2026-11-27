@@ -5,7 +5,7 @@
 - **HU ID:** `HU-08`
 - **Fecha:** 2026-11-27
 - **Estado:** Pendiente de implementacion
-- **Cubre:** RF-17 (reportar el avance: porcentaje, paso actual y tiempo transcurrido), RF-18 (registrar la lista de actividades realizadas durante el analisis), RF-21 (recuperar un analisis interrumpido sin intervencion manual)
+- **Cubre:** RF-17 (reportar el avance: porcentaje, paso actual y tiempo transcurrido), RF-18 (registrar la lista de actividades realizadas durante el analisis), RF-21 (recuperar un analisis interrumpido sin intervencion manual), RF-12 (reportar el estado del procesamiento: en proceso, completado o error)
 - **ADR relacionados:** ADR-14 (seguimiento en la tabla `trabajos`, con latido), ADR-10 (la cola vive en el cliente, el estado vive en el servidor)
 - **Bloquea:** HU-09 (consulta de resultados), HU-10 (reanalisis)
 - **Bloqueado por:** HU-06 (documento registrado), HU-07 (el analisis reporta progreso)
