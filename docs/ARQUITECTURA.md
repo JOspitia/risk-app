@@ -113,7 +113,8 @@ Windows, y **Safari 26 en macOS Tahoe 26 / iOS 26** — no en macOS 15 ni anteri
 | LLM en servidor (v2) | `ollama` (cliente HTTP) o `vllm` | Solo para el modo servidor |
 | Cola de tareas | **Aplazada a la v2** | La v1 no encola: el analisis ocurre en el cliente |
 | Tests | `pytest`, `pytest-asyncio`, `httpx` | Tests de integracion contra Supabase real |
-| Calidad | `ruff` (lint + format), `mypy` (tipos estricto) | |
+| Calidad | `ruff` (lint + format), `mypy` (tipos estricto), `import-linter` | El ultimo verifica la frontera hexagonal sin esperar a un humano |
+| Tipos del cliente | `openapi-typescript` + `openapi-fetch` | Los tipos del frontend se generan del OpenAPI, no se escriben a mano |
 | Containers | `docker compose` | Entorno local reproducible + worker de la v2 |
 
 **El conjunto de dependencias del backend es deliberadamente ligero.** La inferencia ocurre
@@ -122,6 +123,40 @@ con ruedas pesadas, ni servidor de modelos. El nucleo es `fastapi[standard]`, `p
 `httpx` y el SDK de Supabase, mas `pytest` para probar. **No hay Alembic**: las
 migraciones son SQL que aplica el CLI de Supabase (ADR-32). Una dependencia que no
 justifique su peso se rechaza en la revision.
+
+**La frontera hexagonal se verifica sola.** `import-linter` corre en la integracion
+continua desde el primer commit, con contratos explicitos:
+
+```toml
+# backend/pyproject.toml
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "El dominio no depende de nadie"
+type = "forbidden"
+source_modules = ["app.domain"]
+forbidden_modules = ["app.application", "app.adapters", "app.worker", "fastapi", "pydantic", "httpx", "supabase"]
+
+[[tool.importlinter.contracts]]
+name = "La aplicacion no conoce los adaptadores"
+type = "forbidden"
+source_modules = ["app.application"]
+forbidden_modules = ["app.adapters", "fastapi"]
+```
+
+Una dependencia prohibida rompe la integracion continua antes de que la rompa la
+reproduccion de la revision.
+
+**Los tipos del frontend se generan, no se escriben.** El backend expone su OpenAPI y el
+frontend lo consume:
+
+```
+npm run api:types    # lee backend/tests/contract/openapi.json y genera frontend/src/api/types.ts
+```
+
+El archivo generado se versiona, para que un cambio de contrato se vea en el diff y no
+aparezca solo en el momento de compilar.
 
 ### 1.3 Toolchain del frontend
 
@@ -134,14 +169,28 @@ justifique su peso se rechaza en la revision.
 | Estilos | Tailwind CSS | Coherente con la version original del documento |
 | Cliente HTTP | `fetch` tipado con interceptor de token | `fetch` nativo basta para el volumen esperado |
 | Cliente de datos | `@supabase/supabase-js` 2.119.2 | Requiere Node >= 22. Lo que habla con PostgREST |
-| ETL en navegador | `pdf.js` | Extraccion de texto por pagina |
+| ETL en navegador | `pdf.js` | Extraccion de texto por pagina. **Empaquetado localmente**, no desde un CDN: el modo sin conexion lo exige |
 | LLM en navegador | `@mlc-ai/web-llm` 0.2.89 | Ejecucion en Web Worker, **nunca** en el hilo principal |
 | Chunking | Funcion propia compartida con el backend | Mismo algoritmo en ambos lados |
+| Tests | `vitest` + `@vue/test-utils` | Con adaptadores de prueba para `WebGPU`, `WebWorker` y `Cache API` |
 
 **El motor LLM vive en un Web Worker.** Cargar 1.5 a 3 GB de pesos y luego generar token a
 token en el hilo principal bloquearia la interfaz: la app dejaria de responder mientras se
 analiza, que es justo el requisito de que la aplicacion no se afecte. Vite 8 empaqueta los
 modulos de WebAssembly de forma nativa, asi que el worker se importa sin rodeos.
+
+**El troceado se prueba con casos dorados compartidos.** Python y TypeScript no pueden
+importar el mismo archivo de codigo, asi que el algoritmo vive en los dos lados y se
+verifica con el **mismo conjunto de datos**:
+
+```
+shared/chunking-casos.json
+```
+
+El archivo tiene entradas y salidas esperadas. `pytest` las corre en Python y `vitest` las
+corre en TypeScript. Si los dos lados divergen, uno de los dos falla: es exactamente el
+error que un documento con datos contradictorios entre bloques produce, y que en el
+navegador seria muy dificil de diagnosticar.
 
 ---
 
@@ -737,7 +786,6 @@ inicio de sesion.
 | `documentos.compartir` | Compartir un documento con su organizacion |
 | `archivos.descargar` | Descargar el archivo original mediante URL firmada |
 | `archivos.eliminar` | Eliminar el archivo del almacenamiento |
-| `documentos.compartir` | Compartir un documento con su organizacion |
 | `analisis.ver_todos` | Ver analisis de otros usuarios de la organizacion |
 | `plantillas.ver` / `plantillas.editar` | Ver y modificar plantillas de extraccion |
 | `configuracion.ver` / `configuracion.editar` | Ver y modificar la configuracion del motor |
@@ -760,7 +808,9 @@ que la misma aplicacion tenga organizaciones con politicas distintas sin tocar c
 | `archivos.descargar` | si | el propio | si (lectura) |
 | `archivos.eliminar` | si | el propio | no |
 | `analisis.ver_todos` | si | **no** (por defecto) | si (lectura) |
+| `plantillas.ver` | si | si | si (lectura) |
 | `plantillas.editar` | si | no | no |
+| `configuracion.ver` | si | si | si (lectura) |
 | `configuracion.editar` | si | si (propia) | no |
 | `usuarios.gestionar` | si | no | no |
 | `organizacion.gestionar` | si | no | no |
@@ -1257,18 +1307,6 @@ trabajo ya la contempla, pero **la v1 no la necesita y no debe construirla**.
 este volumen y no obliga a mantener conexiones abiertas, lo que es una restriccion real en
 plataformas de funciones. Si mas adelante hace falta, el mismo endpoint sirve para SSE.
 
-### 6.9 El modo hospedado, cuando exista
-
-`[PROPUESTO]` Hoy no aplica: DP-11 cerro en **solo navegador**. Si manana se anade un modo
-hospedado (por ejemplo, para quien no tenga WebGPU), el cambio es:
-
-- El cliente sube el PDF en vez de extraerlo.
-- El worker extrae, divide, ejecuta el LLM y persiste.
-- El contrato de `trabajo` **no cambia**: mismo progreso, misma bitacora, mismos estados.
-- La cola del servidor (`pgmq`) entra, y el worker corre en un contenedor.
-
-Que el contrato no cambie es la prueba de que la decision hexagonal fue la correcta.
-
 ### 6.8 El artefacto JSON y el DTO de salida
 
 `[DECIDIDO]` **El resultado del analisis es un JSON con los resumenes de todos los bloques y
@@ -1327,6 +1365,18 @@ Reglas:
 es el punto de entrada: los resumenes por bloque son los fragmentos que se indexan. El
 `documento_id` y el `indice` de bloque son las claves que permiten reconstruir de donde sale
 cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la pagina.
+
+### 6.9 El modo hospedado, cuando exista
+
+`[PROPUESTO]` Hoy no aplica: DP-11 cerro en **solo navegador**. Si manana se anade un modo
+hospedado (por ejemplo, para quien no tenga WebGPU), el cambio es:
+
+- El cliente sube el PDF en vez de extraerlo.
+- El worker extrae, divide, ejecuta el LLM y persiste.
+- El contrato de `trabajo` **no cambia**: mismo progreso, misma bitacora, mismos estados.
+- La cola del servidor (`pgmq`) entra, y el worker corre en un contenedor.
+
+Que el contrato no cambie es la prueba de que la decision hexagonal fue la correcta.
 
 ---
 
@@ -1472,6 +1522,56 @@ Variables de entorno obligatorias:
 | `MAX_UPLOAD_MB` | `50` | Solo aplica a partir de la v2 |
 | `CORS_ORIGINS` | ninguno | Lista separada por comas |
 | `LOG_LEVEL` | `INFO` | |
+
+Variables del frontend (publicas por definicion, `VITE_` las expone al bundle):
+
+| Variable | Default | Nota |
+|---|---|---|
+| `VITE_SUPABASE_URL` | ninguno | La misma URL del backend |
+| `VITE_SUPABASE_ANON_KEY` | ninguno | La llave publica. **Nunca** la `service_role` |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Donde vive la API |
+
+**El `.env.example` se versiona antes de la primera linea de codigo.** Es el contrato
+entre la maquina y el proyecto: si una variable no esta en el `.env.example`, no existe.
+El `.env` local **no** se versiona nunca (ya esta en `.gitignore`).
+
+```
+backend/.env.example
+  SUPABASE_URL=https://TU-PROYECTO.supabase.co
+  SUPABASE_ANON_KEY=tu-llave-publica
+  SUPABASE_SERVICE_ROLE_KEY=tu-llave-de-servicio
+  SUPABASE_JWT_SECRET=                      # solo con claves simetricas
+  SUPABASE_JWKS_URL=https://TU-PROYECTO.supabase.co/auth/v1/.well-known/jwks.json
+  DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
+  MAX_UPLOAD_MB=50
+  CORS_ORIGINS=http://localhost:5173
+  LOG_LEVEL=INFO
+
+frontend/.env.example
+  VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+  VITE_SUPABASE_ANON_KEY=tu-llave-publica
+  VITE_API_BASE_URL=http://localhost:8000
+```
+
+### 8.1 Que hace `GET /health`
+
+`[DECIDIDO]` La sonda **no** dice "estoy vivo" sin mas. Consulta una vista publica que
+confirma que la base responde y que las migraciones estan aplicadas:
+
+```sql
+-- Vista publica: no expone datos de negocio.
+create or replace view public.salud as
+  select
+    (select count(*) from public.roles) as roles_cargados,
+    (select count(*) from public.permisos) as permisos_cargados;
+```
+
+`GET /health` responde **200** si la consulta devuelve filas y los roles estan cargados, y
+**503** si Supabase no responde o el esquema no esta aplicado. Sin `service_role`: la
+vista es legible por todos y no contiene datos de usuario.
+
+Un healthcheck que siempre responde 200 no sirve para nada: no distingue "todo bien" de
+"la base no esta".
 
 ---
 

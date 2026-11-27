@@ -129,7 +129,7 @@ medida que se implemente cada modulo, en la misma tabla y con el mismo procedimi
    aplicacion. Se cambia con una migracion, no con un click. `[PENDIENTE]` Confirmar si el
    cliente quiere gestion de roles en caliente.
 4. Un usuario desactivado **no puede hacer nada**, sin importar sus permisos. La
-   desactivacion es unaROW mas fuerte que el permiso.
+   desactivacion es una fila mas fuerte que el permiso.
 5. El permiso se comprueba **en el caso de uso**. El router puede comprobarlo tambien, pero
    no es el unico sitio donde se comprueba: una comprobacion unica en el router deja el
    hueco abierto en cuanto alguien llama al caso de uso desde otro camino.

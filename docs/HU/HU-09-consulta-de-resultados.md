@@ -71,7 +71,7 @@ Tres cosas resuelven la visibilidad, que es el objetivo declarado del sistema de
 
 ### Esta HU BLOQUEA
 
-- **HU-10**: el reanalyze parte de un documento archivado que se consulta desde aqui.
+- **HU-10**: el reanálisis parte de un documento archivado que se consulta desde aqui.
 
 ---
 
@@ -237,7 +237,7 @@ el bucket privado, y aunque sola no sirva para nada, no tiene por que viajar.
 | SP-06 | `page = 0` o `page = -1` | Se recorta a 1. No es un error | 200 |
 | SP-07 | `size = 0` | Se recorta al minimo (1). No es un error | 200 |
 | SP-08 | Se pide la **descarga** sin `archivos.descargar` | 403 | 403 |
-| SP-09 | El documento **no tiene archivo archivado** | 409. El documento se analysed pero el archivo no se guardo. Se explica en el mensaje | 409 |
+| SP-09 | El documento **no tiene archivo archivado** | 409. El documento se analizado pero el archivo no se guardo. Se explica en el mensaje | 409 |
 | SP-10 | La **URL firmada ya expiro** | El almacenamiento responde 400 o 403. La UI detecta que expiro y pide una nueva | error del almacenamiento |
 | SP-11 | El **analisis no existe todavia** (documento en proceso) | 404 en el endpoint de analisis, y el detalle muestra el progreso. No se devuelve un analisis vacio | 404 |
 | SP-12 | El **documento esta en error** | El detalle trae `error_mensaje`. El endpoint de analisis responde 404: no hay analisis | 404 |

@@ -125,7 +125,7 @@
 
 - [ ] El bucket es **privado**. No existe ninguna URL publica
 - [ ] El bucket declara `file_size_limit` y `allowed_mime_types`
-- [ ] El backend valida tamano y tipo MIM **antes** de firmar la URL de subida
+- [ ] El backend valida tamano y tipo MIME **antes** de firmar la URL de subida
 - [ ] Las politicas de `storage.objects` cubren insert, select y delete
 - [ ] La clave del objeto es `{organizacion_id}/{usuario_id}/{documento_id}.pdf`
 - [ ] Un usuario de otra organizacion no lee, no descarga y no lista los archivos
@@ -205,7 +205,9 @@
 ## Gate 8 — Pruebas
 
 - [ ] El dominio y los casos de uso tienen pruebas unitarias sin base de datos ni red
-- [ ] Las pruebas de integracion corren contra Postgres real en Docker
+- [ ] Las pruebas de integracion corren contra Supabase real (`supabase start`), no contra un
+      Postgres suelto: hacen falta Auth, PostgREST y Storage para que el aislamiento se
+      pruebe de verdad
 - [ ] Hay una prueba de ciclo de vida completo: crear -> leer -> actualizar -> borrar
 - [ ] Un intento de login en cuenta inactiva, bloqueada o eliminada es rechazado
 - [ ] Dos sesiones simultaneas funcionan ambas

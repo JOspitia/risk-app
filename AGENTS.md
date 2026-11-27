@@ -26,9 +26,18 @@ Antes de escribir o modificar codigo:
 
 - Todo lo funcional que **no** este en `docs/CONTEXTO.md` o `docs/ARQUITECTURA.md` se marca
   `[ABIERTO]` y se anota en `docs/DECISIONES-PENDIENTES.md`.
+- Los cuatro marcadores significan cosas distintas y no son intercambiables:
+
+  | Marcador | Significado |
+  |---|---|
+  | `[DECIDIDO]` | Esta decidido y documentado. Es un hecho del proyecto |
+  | `[PROPUESTO]` | Hay una propuesta, pero el cliente todavia no la confirma |
+  | `[ABIERTO]` | **No** hay decision, y hace falta una para continuar |
+  | `[PENDIENTE]` | Hay decision, pero falta un **dato** que solo tiene el cliente |
+
 - **No se inventan datos.** No se asumen competidores, normas, funcionalidades, campos de
   negocio ni personas que no esten nombrados. Un campo de riesgo desconocido se marca
-  `[ABIERTO]` en la plantilla, no se rellena con un ejemplo plausible.
+  `[PENDIENTE]` en la plantilla, no se rellena con un ejemplo plausible.
 - Cuando un supuesto deba implementarse para avanzar, se escribe como supuesto explicito en
   el ADR y en `DECISIONES-PENDIENTES.md`, nunca como hecho.
 

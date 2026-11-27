@@ -74,7 +74,7 @@ navegador. El navegador **reporta**; el servidor **decide**.
 ### Esta HU BLOQUEA
 
 - **HU-09**: la consulta de resultados muestra el estado del trabajo y su bitacora.
-- **HU-10**: el reanalyze nace de un trabajo interrumpido.
+- **HU-10**: el reanálisis nace de un trabajo interrumpido.
 
 ---
 

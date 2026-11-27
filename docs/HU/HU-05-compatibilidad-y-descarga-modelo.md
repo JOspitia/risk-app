@@ -78,7 +78,7 @@ sola vez, y que se pida permiso de forma explicita.
 | Parametro | Default | Nota |
 |---|---|---|
 | `MODELO_POR_DEFECTO` | el que sugiera la deteccion | Ver HU-04 |
-| `TAMANO_MAXIMO_MODELO_MB` | `3072` | Above del limite de 3 GB |
+| `TAMANO_MAXIMO_MODELO_MB` | `3072` | Por encima del limite de 3 GB |
 | `MINIMO_VRAM_MB` | `1024` | Por debajo, se advierte en vez de bloquear |
 | `MARGEN_VRAM` | `0.15` | 15% de margen al elegir el modelo |
 | `TIMEOUT_DESCARGA_MS` | `600000` | 10 minutos. Si se supera, se cancela y se reintenta |

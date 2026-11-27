@@ -222,7 +222,7 @@ class CrearDocumento:
 > un `RuntimeError`, el manejador global deja de reconocerlos y cada error de negocio se
 > degrada en 500. Es un fallo silencioso y total del mapeo de errores.
 > **Prueba:** dispara un error de dominio y afirma el codigo de estado exacto. Si todo
-> devuelve 500, lo reenvuelveste.
+> devuelve 500, lo reenvuelto.
 
 ### 1.6 Repository / Puerto de salida
 
@@ -986,7 +986,7 @@ declare
   v_resumenes_anterior jsonb;
   v_hay_anterior boolean := false;
 begin
-  -- 1. El aislamiento NO se setrust: se comprueba aqui, dentro de la transaccion.
+  -- 1. El aislamiento NO se da por sentado: se comprueba aqui, dentro de la transaccion.
   select d.id into v_documento
   from public.documentos d
   where d.id = p_documento_id
@@ -1366,7 +1366,7 @@ funcion.
 
 ```
 POST /documentos
-  -> valida tamano y tipo MIM, crea el documento y el trabajo
+  -> valida tamano y tipo MIME, crea el documento y el trabajo
   -> devuelve { documento_id, trabajo_id, url_subida_firmada }
 
 Navegador

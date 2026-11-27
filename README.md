@@ -50,9 +50,9 @@ ejecuta en el navegador del usuario.
 | Area | Estado |
 |---|---|
 | Especificacion funcional | Completa. 25 RF + 9 RNF |
-| Decisiones de arquitectura | Completas. 28 ADR |
+| Decisiones de arquitectura | Completas. 34 ADR |
 | Decisiones de producto | Completas. 15 de 15 cerradas |
-| Historias de usuario | **10 de 10** escritas |
+| Historias de usuario | **12 de 12** escritas |
 | Metodo y contratos de codigo | Completo. `SKILL.md` |
 | Gates de verificacion | Completos. 17 gates en `CHECKLIST.md` |
 | **Codigo de aplicacion** | **No existe todavia** |
@@ -207,7 +207,7 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `README.md` | Este brief | Primero, siempre |
 | `AGENTS.md` | Reglas del repositorio y orden de lectura | Antes de tocar nada |
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones | Para entender el **que** |
-| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **28 ADR** | Para entender el **como** |
+| `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **34 ADR** | Para entender el **como** |
 | `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-13** | Para saber que esta abierto |
 | `docs/HU/INDICE.md` | Indice de historias de usuario y grafo de dependencias | Para planificar trabajo |
 | `docs/HU/HU-0*.md` | Historias de usuario completas | Antes de implementar una funcionalidad |
