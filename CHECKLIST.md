@@ -195,7 +195,7 @@
 
 ---
 
-## Gate 7 — Pruebas
+## Gate 8 — Pruebas
 
 - [ ] El dominio y los casos de uso tienen pruebas unitarias sin base de datos ni red
 - [ ] Las pruebas de integracion corren contra Postgres real en Docker
@@ -215,7 +215,7 @@
 
 ---
 
-## Gate 8 — Listo para el frontend
+## Gate 9 — Listo para el frontend
 
 - [ ] `GET /health` responde 200 e informa el estado de la base de datos
 - [ ] Todas las rutas estan documentadas con metodo, ruta, forma de peticion y de respuesta
@@ -235,7 +235,7 @@
 
 ---
 
-## Gate 9 — Privacidad
+## Gate 10 — Privacidad
 
 - [ ] El PDF original **no sale del equipo del usuario** en el camino principal
 - [ ] Ningun texto extraido aparece en logs, traces ni metricas
@@ -246,7 +246,7 @@
       terceros
 - [ ] El `service_role` no se usa para atender peticiones de usuario final
 
-## Gate 10 — Despliegue
+## Gate 11 — Despliegue
 
 - [ ] El backend es stateless: no mantiene conexiones abiertas entre peticiones
 - [ ] El camino de ejecucion **no** usa una conexion TCP a Postgres (solo PostgREST/RPC),
@@ -275,7 +275,7 @@
 
 ---
 
-## Gate 11 — Cambios de proveedor
+## Gate 12 — Cambios de proveedor
 
 Estos items aplican cuando se cambia un motor, un almacenamiento o un despliegue. **Ningun
 cambio de proveedor es un cambio de codigo en los casos de uso.**

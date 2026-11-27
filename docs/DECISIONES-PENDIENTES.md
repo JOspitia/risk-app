@@ -17,18 +17,18 @@ afectado.
 
 | ID | Pregunta | Impacto | Estado |
 |---|---|---|---|
+| DP-01 | Arquitectura del backend: hexagonal o en capas | Alto | **Cerrada** — hexagonal (ADR-02) |
+| DP-02 | Modo de ejecucion del LLM en la v1 | Alto | **Cerrada** — navegador (ADR-06) |
 | DP-03 | Tipo de documentos: digitales, escaneados o ambos | Alto | **Cerrada** — solo digitales (ADR-11) |
 | DP-04 | Politica de visibilidad y roles | Alto | **Cerrada** — el permiso decide (ADR-12, ADR-13, ADR-17) |
+| DP-05 | Autenticacion | Alto | **Cerrada** — Supabase Auth (ADR-05) |
+| DP-06 | Donde corre el backend | Alto | **Cerrada** — Vercel + Supabase (ADR-07) |
 | DP-07 | Que hace exactamente el LLM con cada bloque | Medio | **Cerrada** — resumenes por bloque en un JSON (ADR-15) |
 | DP-08 | Hardware de los equipos de los usuarios | Medio | **Cerrada** — 8 a 16 GB, equipos de oficina |
 | DP-09 | Formato de la entrega de resultados | Bajo | **Cerrada** — JSON mapeado por DTO (ADR-15) |
 | DP-10 | Modelo por defecto y como se elige | Medio | **Cerrada** — default + panel de configuracion (ADR-16) |
-| DP-12 | Presupuesto de tiempo de analisis | Medio | **Cerrada** — trabajo asincrono y progreso (ADR-14) |
-| DP-01 | Arquitectura del backend | Alto | **Cerrada** — hexagonal (ADR-02) |
-| DP-02 | Modo de ejecucion del LLM en la v1 | Alto | **Cerrada** — navegador (ADR-06) |
-| DP-05 | Autenticacion | Alto | **Cerrada** — Supabase Auth (ADR-05) |
-| DP-06 | Donde corre el backend | Alto | **Cerrada** — Vercel + Supabase (ADR-07) |
 | DP-11 | Caminos disponibles para quien no tiene WebGPU | Alto | **Cerrada** — solo navegador (ADR-19) |
+| DP-12 | Presupuesto de tiempo de analisis | Medio | **Cerrada** — trabajo asincrono y progreso (ADR-14) |
 | DP-13 | Que pasa con los resultados cuando cambia la plantilla | Bajo | **Cerrada** — se guardan los documentos (ADR-20) |
 | DP-14 | Alta de usuarios desde la app | Medio | **Cerrada** — contrasena autogenerada por correo (ADR-18) |
 | DP-15 | Politica de retencion de los documentos archivados | Medio | **Cerrada** — supuesto por defecto (ADR-22) |
@@ -36,6 +36,77 @@ afectado.
 ---
 
 # Cerradas
+
+## DP-01 — Arquitectura del backend — CERRADA
+
+**Decision.** `[DECIDIDO]` **Hexagonal (puertos y adaptadores).** ADR-02, 2026-11-27.
+
+**Por que.** Hay tres adaptadores de salida intercambiables (Supabase, motor LLM,
+almacenamiento) y dos modos de ejecucion del pipeline (navegador y servidor). La version en
+capas resolveria el modo doble con banderas `if` repartidas por los servicios; con puertos
+se resuelve con un adaptador mas. Ademas, el dominio se prueba sin base de datos ni red.
+
+**Como se refleja en el codigo.** `domain/` sin dependencias de framework; los puertos los
+define el dominio; `application/` con los casos de uso; `adapters/` con FastAPI, Supabase,
+LLM y ETL. La tabla de mapeo contra la version en capas esta en `ARQUITECTURA.md` seccion
+2.3, y los contratos del skill original se conservan mapeados uno a uno.
+
+**El criterio de decision fue el costo de revertir.** Cambiar de estilo arquitectonico con
+codigo escrito es caro; decidirlo antes de escribir la primera linea es gratis.
+
+## DP-02 — Modo de ejecucion del LLM en la version 1 — CERRADA
+
+**Decision.** `[DECIDIDO]` **El LLM se ejecuta en el navegador del usuario** (WebLLM sobre
+WebGPU). ADR-06, 2026-11-27.
+
+**Por que.** Tres razones se alinearon:
+
+1. **Privacidad.** El documento no sale del equipo del usuario. Es la forma mas fuerte de
+   cumplir el requisito critico.
+2. **Costo.** No hay GPU que pagar. Los ~200 usuarios aportan su propio hardware.
+3. **Despliegue.** Encaja con Vercel: la API solo recibe resultados ya calculados, asi que
+   no necesita procesos largos ni cola de tareas.
+
+**Como se refleja en el codigo.** El pipeline ETL + LLM vive en el frontend, en un Web
+Worker. La API expone `POST /api/v1/documentos` para registrar resultados ya validados. El
+modo `servidor_python` queda como un adaptador mas para la v2.
+
+**Consecuencia asumida.** WebGPU no esta en todas las plataformas (~88.6% de cobertura
+global). El camino alterno esta en DP-11.
+
+## DP-05 — Autenticacion — CERRADA
+
+**Decision.** `[DECIDIDO]` **Supabase Auth emite el JWT; el backend lo valida y lo reenvia a
+Postgres para que RLS filtre.** ADR-05, 2026-11-27.
+
+**Por que.** Una sola fuente de identidad. RLS deja de depender del codigo de aplicacion.
+El hashing de contrasenas y la tabla de sesiones revocables quedan **fuera del alcance**, no
+se mantienen como texto decorativo.
+
+**Como se refleja en el codigo.** El backend valida firma, `exp`, `aud` e `iss` del token de
+Supabase, resuelve el perfil (rol, `organizacion_id`) y construye el `AuditContext`. Nunca
+usa la `service_role` para atender peticiones de usuario final; esa llave queda confinada al
+adaptador de administracion (DP-14).
+
+## DP-06 — Despliegue — CERRADA
+
+**Decision.** `[DECIDIDO]` Despliegue en niveles. ADR-04, ADR-07, 2026-11-27.
+
+| Nivel | Componente | Plataforma v1 |
+|---|---|---|
+| 1 | Frontend Vue estatico | Vercel (o cualquier CDN) |
+| 2 | API FastAPI stateless | Vercel Functions (runtime de Python) |
+| 3 | Datos, identidad y archivos | Supabase (Postgres + Auth + RLS + PostgREST + Storage) |
+| 4 | Worker ETL con LLM hospedado | **No se desplega en la v1** (DP-11) |
+
+**Por que.** El backend habla con Supabase **por HTTP**, no por TCP a Postgres. Eso lo deja
+stateless y portable a Cloudflare Workers, Fly.io o un contenedor sin cambios de codigo. La
+atomicidad de la persistencia se resuelve con funciones de Postgres (RPC), de modo que la
+transaccion vive dentro de la base de datos.
+
+**Sobre Docker.** Vercel **no** ejecuta contenedores Docker en produccion: compila desde el
+codigo fuente. El `Dockerfile` sirve para el entorno local reproducible y para que el worker
+de un futuro modo hospedado ya exista cuando se quiera ir a un servidor privado.
 
 ## DP-03 — Tipo de documentos — CERRADA
 
