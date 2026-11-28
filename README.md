@@ -59,6 +59,7 @@ ejecuta en el navegador del usuario.
 | **Esqueleto del proyecto** | **Listo.** Backend y frontend instalan, compilan y verifican |
 | **Migracion de base de datos** | **Lista.** Esquema, RLS, permisos, bucket y funciones RPC, aplicados contra una base **vacia** y verificados con usuarios reales |
 | **Advisor de Supabase** | **Sin ERROR ni WARN.** De 56 hallazgos a 29, y los 29 que quedan son de nivel INFO (indices sin uso en una base vacia) |
+| **Aislamiento** | **Verificado con usuarios reales.** RLS en las 17 tablas, `FORCE ROW LEVEL SECURITY`, y las funciones RPC fuera del alcance del rol `anon` |
 | Logica de negocio | **No existe todavia.** Sin endpoints, sin dominio, sin adaptadores |
 | Pendientes documentados | 15 (PP-01 a PP-15) |
 

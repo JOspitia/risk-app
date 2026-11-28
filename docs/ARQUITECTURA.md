@@ -786,6 +786,46 @@ Y hay una cuarta regla, que se aplico a todas las politicas: **ninguna politica 
 directamente una tabla que tenga RLS**. Cuando hace falta, la consulta va por una funcion
 de `security`. asi el ciclo no puede formarse.
 
+**La segunda mitad de la historia: quien puede llamar a las funciones.** `[DECIDIDO]`
+El esquema `security` no solo evita la recursion: **tambien saca las funciones del
+alcance de `anon`**. Es la misma decision por dos razones distintas, y conviene no
+confundirlas.
+
+`public` es el esquema que el Data API expone. El rol `anon` es el que atiende las
+peticiones **sin token**. Cualquier funcion de `public` sobre la que `anon` tenga
+`EXECUTE` se puede llamar por HTTP sin autenticarse. Y como las funciones RPC son
+`security definer`, se ejecutan con los privilegios del dueno (`postgres`, que tiene
+`BYPASSRLS`): **el RLS no las protege**, porque no es el RLS quien decide, es la
+funcion.
+
+Verificado el 2026-11-28 contra el stack local, antes de la correccion:
+
+```sql
+set role anon;
+select revocar_sesion('sesion-falsa', now() + interval '1 hour');
+-- INSERT 0 1   <-- escritura sin autenticacion
+```
+
+`revocar_sesion` no comprobaba nada: cualquier visitante, sin token, revocaba la
+sesion de cualquier usuario si conocia su `session_id` (que viaja en el JWT). Es un
+denegado de servicio de autenticacion. Las otras tres funciones si validaban la
+propiedad del documento o del trabajo, asi que fallaban, pero por accidente y no por
+diseno: cualquier funcion nueva en `public` nace con el mismo problema.
+
+Por eso las cinco RPC se mueven al esquema `security` (ADR-36) y se les revoca
+`EXECUTE` a `anon`. Y se acompana de `FORCE ROW LEVEL SECURITY`, que hace que el RLS
+aplique **tambien al dueno** de las tablas: sin eso, cualquier consulta con
+`postgres` se saltaria el RLS. Las dos cosas van juntas: `FORCE` cierra la puerta y
+`set row_security = off` es la llave que usan las funciones privilegiadas.
+
+> **Al revocar, cuidado con el rol del que se revoca.** `public` es el rol del que
+> todos heredan: revocar `EXECUTE` a `public` le quita el permiso tambien a
+> `authenticated`, y las politicas se quedan sin poder llamar a sus propias funciones
+> de apoyo. Hay que revocar a `anon` explicitamente y volver a dar el permiso a
+> `authenticated`. Verificado el 2026-11-28, cuando la primera version de la
+> migracion lo hizo y las politicas quedaron sin permiso para invocar
+> `organizacion_activa`.
+
 
 
 **Dos capas, y por que son distintas.** RLS filtra **filas**: que documentos existen y son
@@ -1618,7 +1658,7 @@ Variables del frontend (publicas por definicion, `VITE_` las expone al bundle):
 | Variable | Default | Nota |
 |---|---|---|
 | `VITE_SUPABASE_URL` | ninguno | La misma URL del backend |
-| `VITE_SUPABASE_ANON_KEY` | ninguno | La llave publica. **Nunca** la `service_role` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | ninguno | La llave publica. **Nunca** la `service_role` |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | Donde vive la API |
 
 **El `.env.example` se versiona antes de la primera linea de codigo.** Es el contrato
@@ -1639,7 +1679,7 @@ backend/.env.example
 
 frontend/.env.example
   VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
-  VITE_SUPABASE_ANON_KEY=tu-llave-publica
+  VITE_SUPABASE_PUBLISHABLE_KEY=tu-llave-publica
   VITE_API_BASE_URL=http://localhost:8000
 ```
 
@@ -1847,6 +1887,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-33 | El aislamiento se resuelve desde `organizaciones_miembros`, y el esquema se completa con las tablas que las historias ya exigian | 2026-11-27 | Aceptada | `perfiles.organizacion_id` es un solo campo, pero un usuario puede pertenecer a varios equipos: una politica que se apoyara en el perfil le daria acceso a la otra organizacion. Y `organizaciones_miembros` no cubre el caso de un `analista` sin `analisis.ver_todos`, que por la puerta de PostgREST leeria los documentos de sus companeros: la matriz de permisos se esquivaba. El DDL, ademas, estaba desincronizado con las historias: faltaban la tabla de auditoria, la de compartidos, la de sesiones revocadas y varias columnas. Como el esquema todavia no existe en ninguna base, se corrige ahora |
 | ADR-34 | Editar una plantilla de extraccion crea una version nueva; la anterior se conserva | 2026-11-27 | Aceptada | Los analisis guardan la version de plantilla que usaron. Si la plantilla se modificara en el sitio, un analisis de hace tres meses quedaria explicando con reglas que ya no son las que se aplicaron, y no habria forma de reconstruir cual era. Versionar tambien permite volver a una version anterior. El precio es una tabla que crece, y una version activa unica garantizada con un indice parcial |
 | ADR-35 | Las funciones de apoyo de las politicas RLS viven en el esquema `security`, con `set row_security = off` | 2026-11-28 | Aceptada | Sin esto, las politicas se recursionan: la de `perfiles` llama a la que comprueba si el usuario esta activo, que a su vez consulta `perfiles`. Postgres aborta con `stack depth limit exceeded` y, cuando una politica falla en error, la fila **no** se filtra: el aislamiento queda anulado en silencio. Mover las funciones a otro esquema no basta, porque una `security definer` sigue disparando las politicas de las tablas que consulta (`authenticated` no tiene `BYPASSRLS`). `set row_security = off` hace que el propietario de la funcion lea los datos crudos, sin reevaluar la politica. Verificado el 2026-11-28 contra la base local |
+| ADR-36 | Las funciones RPC viven en el esquema `security` y solo `authenticated` puede llamarlas | 2026-11-28 | Aceptada | `public` es el esquema que el Data API expone, y el rol `anon` (el que atiende las peticiones sin token) puede llamar a cualquier funcion de `public` sobre la que tenga `EXECUTE`. Las cinco funciones RPC eran `security definer`, asi que se ejecutaban con los privilegios del dueno (`postgres`, con `BYPASSRLS`) y **el RLS no las protegia**: no era el RLS quien decidia, era la funcion. Verificado el 2026-11-28: `revocar_sesion` permitia a un visitante sin sesion revocar la sesion de cualquier usuario que conociera su `session_id` (que viaja en el JWT). Se mueven al esquema `security` y se revoca `EXECUTE` a `anon`. Se acompana de `FORCE ROW LEVEL SECURITY`, que hace que el RLS aplique tambien al dueno de las tablas |
 
 ### 10.1 Como se registra una decision nueva
 

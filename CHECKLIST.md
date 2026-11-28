@@ -94,7 +94,7 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 - [x] Se leieron `docs/CONTEXTO.md`, `docs/ARQUITECTURA.md` y `docs/DECISIONES-PENDIENTES.md`
       — los tres vigentes, leidos al escribir cada HU y cada ADR
 - [x] Los ADR aplicables a la iteracion estan identificados en la tabla de
-      `docs/ARQUITECTURA.md` seccion 10 — 35 ADR; cada commit referencia el suyo al pie
+      `docs/ARQUITECTURA.md` seccion 10 — 36 ADR; cada commit referencia el suyo al pie
 - [x] Las preguntas abiertas que tocan el alcance estan resueltas o el supuesto esta
       anotado en el ADR — 15 DP cerradas; las 15 PP (PP-01 a PP-15) tienen supuesto explicito
 - [x] El alcance de la iteracion esta escrito en una frase — seccion 1 de cada HU, y el
@@ -140,6 +140,17 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
       `bloques.datos_estructurados` tiene `bloques_riesgos_gin` (GIN); los demas JSONB
       (`plantillas.esquema`, `analisis_documentos.riesgos`, `auditoria.detalles`) no se
       consultan por contenido en la v1
+- [x] Las **funciones RPC no son alcanzables sin sesion** — verificado el 2026-11-28:
+      las cinco RPC vivian en `public` (el esquema que expone el Data API) y eran
+      `security definer`, asi que el rol `anon` (peticiones sin token) podia
+      llamarlas y ejecutarlas con los privilegios del dueno, saltandose el RLS.
+      Comprobado: `revocar_sesion` permitia a un visitante sin sesion revocar la
+      sesion de cualquier usuario que conociera su `session_id`. Ahora viven en el
+      esquema `security` y `anon` no tiene `EXECUTE` sobre ninguna (ADR-36)
+- [x] `FORCE ROW LEVEL SECURITY` en las 17 tablas — verificado el 2026-11-28: sin
+      esta linea, el dueno de la tabla (`postgres`, con `BYPASSRLS`) no respeta el
+      RLS. Las funciones privilegiadas siguen leyendo lo que necesitan porque
+      declaran `set row_security = off` (ADR-35, ADR-36)
 - [x] El **advisor oficial de Supabase** (`supabase db advisors`) no reporta ningun
       hallazgo de nivel ERROR ni WARN — verificado el 2026-11-28: de 56 hallazgos a 29,
       y los 29 que quedan son de nivel INFO. Las correcciones fueron:

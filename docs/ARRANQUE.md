@@ -190,6 +190,7 @@ Las que existen hoy:
 | `005_funciones_rpc.sql` | Las funciones de atomicidad: `guardar_analisis`, `registrar_actividad`, `actualizar_trabajo`, `mis_permisos`, `revocar_sesion` |
 | `006_advisor_supabase.sql` | Las correcciones que pidio el advisor oficial: indice en cada FK, `(select auth.uid())` en las politicas, y las politicas unificadas |
 | `007_politicas_por_operacion.sql` | Cada politica `for all` partida en `for insert`, `for update` y `for delete` |
+| `008_funciones_fuera_de_alcance_anon.sql` | Las funciones RPC al esquema `security`, `EXECUTE` revocado a `anon`, y `FORCE ROW LEVEL SECURITY` en las 17 tablas |
 
 Ademas, `supabase/seed.sql` siembra la **plantilla generica v1** (plantilla del
 sistema, visible para todos). No siembra usuarios ni organizaciones: el primer
@@ -452,8 +453,22 @@ Y el `frontend/.env` lleva la URL y la llave **publicable**:
 
 ```
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<publishable key del panel>
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key del panel>
 ```
+
+> **El prefijo es `VITE_`, no `NEXT_PUBLIC_`.** El prefijo lo elige el bundler, no
+> Supabase. Este proyecto usa Vite, y Vite solo expone al navegador las variables
+> que empiezan por `VITE_`. Con `NEXT_PUBLIC_` (que es el de Next.js) la variable
+> llega al navegador como `undefined`: **no hay error al compilar**, el error sale en
+> la consola del navegador, en produccion. El `.env.example` del frontend lo
+> advierte, y hay una prueba (`frontend/src/env.spec.ts`) que falla en la
+> compilacion si las variables no llegan.
+
+> **El nombre de la variable en el backend es distinto a propósito.** Ahi se llama
+> `SUPABASE_ANON_KEY`, porque asi la llama el SDK de Python. El **valor** es el
+> mismo: la publishable key. Solo cambia el nombre para que el backend y el
+> frontend no se confundan: en el backend hay dos llaves y una de ellas no puede
+> tocar el navegador.
 
 > **El secret key no viaja al navegador.** Va solo en el backend, y ahi solo lo usa
 > el adaptador de administracion (ADR-13).
