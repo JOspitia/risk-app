@@ -1956,14 +1956,23 @@ frontend/src/
 
 ```typescript
 // api/cliente.ts
-const cliente = createClient({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  onRequest({ request, accessToken }) {
-    if (accessToken) {
-      request.headers.set('Authorization', `Bearer ${accessToken}`)
+// La version instalada de `openapi-fetch` (0.17) usa `baseUrl` (no `baseURL`)
+// y no admite middleware en `createClient`: el interceptor se registra con
+// `use`. Ademas, el `fetch` se captura al crear el cliente, asi que se
+// resuelve en cada llamada para que las pruebas lo puedan interceptar.
+const cliente = createClient<paths>({
+  baseUrl: import.meta.env.VITE_API_BASE_URL,
+  fetch: (peticion) => globalThis.fetch(peticion),
+})
+
+cliente.use({
+  async onRequest({ request }) {
+    const token = await tokenDeSupabase()
+    if (token !== null) {
+      request.headers.set('Authorization', `Bearer ${token}`)
     }
   },
-  onResponseError({ response }) {
+  async onResponse({ response }) {
     if (response.status === 401) {
       // limpiar sesion y redirigir a login, una sola vez
     }
