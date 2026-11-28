@@ -1978,19 +1978,33 @@ const cliente = createClient({
 - **La funcion tiene 300 s por defecto.** La API solo recibe resultados: cabe de sobra.
 - **Vercel no ejecuta Docker en produccion.** El `Dockerfile` es para el entorno local
   reproducible y para el worker de la v2.
-- El `vercel.json` declara el runtime de Python y el `maxDuration` por ruta. Se fija
-  explicitamente, para que un cambio de comportamiento no dependa del default.
+- El `vercel.json` fija el `maxDuration` por ruta. Se fija explicitamente, para que un
+  cambio de comportamiento no dependa del default.
 
 ```json
 // vercel.json
 {
-  "builds": [{ "src": "backend/api/index.py", "use": "@vercel/python" }],
-  "routes": [{ "src": "/api/(.*)", "dest": "backend/api/index.py" }],
   "functions": {
-    "backend/api/index.py": { "maxDuration": 60 }
-  }
+    "backend/api/index.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{tests/**,**/*.test.py,fixtures/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": "/backend/api/index.py" }
+  ]
 }
 ```
+
+**La version de Python NO se declara en el `vercel.json`.** Vercel la lee del
+`requires-python` del `pyproject.toml` o de un `.python-version` en la raiz. La propiedad
+`runtime` de `functions` es para runtimes **no soportados** de forma nativa (como
+`vercel-php`); usarla para Python se ignora o rompe el despliegue. Lo mismo aplica a
+`builds`/`routes`: `rewrites` es la forma actual.
+
+> `excludeFiles` no es cosmetico. Las funciones de Python no se tree-shakean: Vercel
+> empaqueta **todo** lo que alcanza en tiempo de build. Sin esto, los tests viajan al
+> bundle de produccion.
 
 ---
 
@@ -2124,6 +2138,23 @@ endpoint esta mal.** Una prueba que no puede fallar no prueba nada.
 Se organizan por superficie de ataque y etapa del ciclo de vida, no por clase. Quien integra
 el frontend pregunta en este orden: ¿arranca?, ¿autentica?, ¿hace CRUD?, ¿aguanta carga?,
 ¿se rompe si alguien escribe mal?
+
+**Donde vive cada prueba.** El backend y el frontend no usan la misma convencion, y no es
+un descuido: lo que se prueba y la forma de probarlo son cosas distintas.
+
+| Capa | Convencion | Ejemplo |
+|---|---|---|
+| Backend | Carpeta por tipo de prueba: `tests/unit/`, `tests/integration/`, `tests/contract/` | `backend/tests/unit/test_config.py` |
+| Frontend | Archivo `*.spec.ts` **junto al componente** que prueba | `frontend/src/views/DocumentosView.spec.ts` |
+
+En el frontend, la prueba vive con el componente porque el componente es la unidad que se
+mueve: cuando cambia, la prueba se mueve con el. La convencion de carpeta del backend
+responde a otra pregunta —¿esta prueba necesita una base de datos real?— y en el
+frontend casi ninguna la necesita.
+
+La consequencea practica: `npm run test` corre **todas** las pruebas del frontend, sin
+filtros por tipo. Un filtro por carpeta solo tiene sentido cuando hay pruebas de un tipo
+que no se pueden correr en cualquier maquina.
 
 ### 13.1 Capa 1 — Bootstrap
 
