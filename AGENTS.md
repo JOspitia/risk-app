@@ -233,7 +233,12 @@ verdad: las dos se actualizan en el mismo commit.
 | `docs/ARQUITECTURA.md` | Stack, arquitectura, carpetas, modelo de datos, ADR |
 | `docs/DECISIONES-PENDIENTES.md` | Preguntas abiertas con impacto y supuestos |
 | `docs/HU/` | Historias de usuario: camino feliz, caminos de error y criterios de aceptacion |
+| `docs/ARRANQUE.md` | Guia de arranque local: requisitos, comandos, orden de trabajo |
 | `SKILL.md` | Metodo y contratos de codigo (skill instalable) |
 | `CHECKLIST.md` | Gates de verificacion |
 | `CONTRIBUTING.md` | Convencion de commits y pull requests |
+| `backend/` | Codigo de la API (FastAPI). `app/`, `tests/`, `api/` |
+| `frontend/` | Codigo de la SPA (Vue 3.5). `src/`, `workers/` |
+| `supabase/` | `config.toml` y `migrations/*.sql`: el esquema del proyecto |
+| `shared/` | Fixtures compartidas entre Python y TypeScript (casos dorados del chunking) |
 | `docs/legacy/` | Documentos originales sin procesar. No se editan |

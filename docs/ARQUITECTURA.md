@@ -6,7 +6,7 @@
 > [../SKILL.md](../SKILL.md).
 
 - **Estado:** vigente
-- **Ultima actualizacion:** 2026-11-27
+- **Ultima actualizacion:** 2026-11-28
 
 ---
 
@@ -289,19 +289,25 @@ interface la define el dominio y la implementa la infraestructura, no al reves.
 ```
 Risk-app/
 ├── AGENTS.md                     # punto de entrada para cualquier agente
+├── README.md                     # brief para revisores
 ├── SKILL.md                      # metodo y contratos de codigo (instalable como skill)
 ├── CHECKLIST.md                  # gates de verificacion
+├── CONTRIBUTING.md               # convencion de commits y pull requests
 ├── vercel.json                   # config de despliegue de la API y el frontend
 ├── docs/
 │   ├── CONTEXTO.md
 │   ├── ARQUITECTURA.md
 │   ├── DECISIONES-PENDIENTES.md
+│   ├── ARRANQUE.md               # guia de arranque local
+│   ├── HU/                       # historias de usuario
 │   └── legacy/                   # documentos originales, sin procesar
 ├── backend/
-│   ├── pyproject.toml
+│   ├── pyproject.toml            # pins exactos y configuracion de ruff/mypy/pytest
 │   ├── Dockerfile                # entorno local y futuro despliegue self-hosted
+│   ├── .env.example              # el contrato de variables; el `.env` no se versiona
 │   ├── api/index.py              # handler de Vercel (@vercel/python) que expone `app`
-│   ├── app/│   │   ├── main.py               # composicion: app FastAPI + routers + handlers
+│   ├── app/
+│   │   ├── main.py               # composicion: app FastAPI + routers + handlers
 │   │   ├── config.py             # pydantic-settings; falla al arrancar si falta config
 │   │   ├── domain/               # SIN dependencias de framework ni de infra
 │   │   │   ├── entities/         #   documento.py, bloque.py, analisis.py, plantilla.py
@@ -341,10 +347,11 @@ Risk-app/
 │   │   └── 005_funciones_rpc.sql
 │   └── seed.sql                  #   datos semilla: roles, permisos, plantilla v1
 ├── shared/                       #   fixtures compartidas entre Python y TypeScript
-│   └── chunking-casos.json       #   casos dorados del troceado (ver §5.4)
+│   └── chunking-casos.json       #   casos dorados del troceado (ver §1.2)
 └── frontend/
     ├── package.json
     ├── vite.config.ts
+    ├── .env.example              # el contrato de variables; el `.env` no se versiona
     └── src/
         ├── main.ts
         ├── App.vue
@@ -353,6 +360,7 @@ Risk-app/
         ├── api/                   #   cliente HTTP + tipos
         ├── components/
         ├── views/
+        │   ├── InicioView.vue
         │   ├── LoginView.vue
         │   ├── DocumentosView.vue
         │   ├── DocumentoDetalleView.vue
@@ -360,6 +368,16 @@ Risk-app/
         ├── workers/               #   Web Worker: pdf.js + WebLLM
         └── shared/                #   chunking compartido con el backend
 ```
+
+> **El arbol documentado y el arbol real no coinciden todavia.** Este bloque es el
+> **destino**: la estructura que tendra el proyecto cuando la implementacion este
+> completa. Lo que existe hoy es el esqueleto: las carpetas, la configuracion y los
+> `__init__.py`; los archivos listados dentro de cada carpeta (`main.py`, los
+> `errors.py`, los routers, las migraciones, `Dockerfile`, `seed.sql`) llegan con
+> sus bloques.
+>
+> Un `.gitkeep` mantiene las carpetas vacias en el repositorio: git no versiona
+> carpetas vacias, y sin el el arbol del clon no coincidiria con este.
 
 **Regla de dependencia del nucleo:** `domain/` no importa nada de `adapters/`, `application/`
 ni de frameworks (FastAPI, Pydantic, cliente HTTP). Los casos de uso conocen el dominio y los

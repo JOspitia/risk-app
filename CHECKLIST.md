@@ -5,7 +5,7 @@
 > cumplido.
 
 - **Estado:** vigente
-- **Ultima actualizacion:** 2026-11-27
+- **Ultima actualizacion:** 2026-11-28
 
 ---
 
@@ -42,8 +42,11 @@
 ## Gate 2 — Seguridad
 
 - [ ] Ningun secreto en el codigo ni en `.env` versionado
-- [ ] El arranque **falla** si falta `JWT_SECRET` u otra variable obligatoria
-- [ ] `JWT_SECRET` tiene 32 caracteres o mas
+- [ ] El arranque **falla** si falta `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+      `SUPABASE_SERVICE_ROLE_KEY` u otra variable obligatoria
+- [ ] La validacion del token usa el **JWKS del proyecto** (`{SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
+      no un secreto simetrico. `SUPABASE_JWT_SECRET` solo aplica a proyectos con claves
+      simetricas (HS256) y es opcional (ADR-31)
 - [ ] `service_role` no se usa para atender peticiones de usuario final
 - [ ] `service_role` nunca se expone al frontend ni viaja en el bundle
 - [ ] La validacion del token comprueba firma, `exp`, `aud` y emisor
@@ -110,7 +113,9 @@
 
 - [ ] El alta exige el permiso `usuarios.gestionar`
 - [ ] La contrasena temporal se genera con un generador criptografico, no con `random`
-- [ ] El usuario se crea con la cuenta **sin confirmar**, y la confirmacion va en el correo
+- [ ] El usuario se crea con la cuenta **confirmada** (`email_confirm = true`) y la credencial
+      temporal viaja en el correo. Sin confirmar, el inicio de sesion responde "correo no
+      confirmado" y la credencial no sirve para nada (HU-03 §5)
 - [ ] El perfil queda marcado con `debe_cambiar_contrasena = true`
 - [ ] El frontend fuerza el cambio de contrasena en el primer inicio de sesion
 - [ ] El **cuerpo del correo** no aparece en los logs; los logs solo registran que se envio
@@ -264,8 +269,9 @@
       para que la migracion a Cloudflare Workers sea posible sin cambios
 - [ ] Las funciones de Postgres con `security definer` comprueban el permiso **dentro** de la
       funcion, y tienen `set search_path = public`
-- [ ] `vercel.json` declara el runtime de Python y el `maxDuration` por ruta, de forma
-      explicita
+- [ ] `vercel.json` fija el `maxDuration` por ruta de forma explicita, y excluye los tests del
+      bundle (`excludeFiles`). La **version de Python no se declara en el `vercel.json`**: la
+      define el `requires-python` del `pyproject.toml`
 - [ ] Ningun endpoint del camino principal acepta un cuerpo mayor a 4.5 MB
 - [ ] La API responde en menos de 300 s con la carga esperada (limite por defecto de la
       funcion)

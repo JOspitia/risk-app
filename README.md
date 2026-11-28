@@ -10,8 +10,9 @@ Este README es el **brief de entrada**. Sirve para dos cosas:
 2. Que **otra IA** (Copilot, GPT, el agente que sea) pueda leer el repositorio, revisar la
    especificacion y devolver hallazgos utiles **sin necesitar contexto previo**.
 
-- **Estado:** especificacion completa. **Todavia no hay codigo de aplicacion.**
-- **Ultima actualizacion:** 2026-11-27
+- **Estado:** especificacion completa. **Esqueleto de codigo listo**: el backend y el frontend
+  arrancan, compilan y pasan sus verificaciones. Todavia no hay logica de negocio.
+- **Ultima actualizacion:** 2026-11-28
 - **Idioma:** espanol (CO). La documentacion, los identificadores y los mensajes estan en
   espanol a proposito.
 
@@ -55,10 +56,12 @@ ejecuta en el navegador del usuario.
 | Historias de usuario | **12 de 12** escritas |
 | Metodo y contratos de codigo | Completo. `SKILL.md` |
 | Gates de verificacion | Completos. 17 gates en `CHECKLIST.md` |
-| **Codigo de aplicacion** | **No existe todavia** |
-| Pendientes documentados | 13 (PP-01 a PP-13) |
+| **Esqueleto del proyecto** | **Listo.** Backend y frontend instalan, compilan y verifican |
+| Logica de negocio | **No existe todavia.** Sin endpoints, sin dominio, sin adaptadores |
+| Pendientes documentados | 14 (PP-01 a PP-14) |
 
-**La siguiente fase** es el esqueleto del backend y la primera migracion.
+**La siguiente fase** es la migracion: esquema con RLS, matriz de permisos y bucket privado,
+aplicada contra una base **vacia**.
 
 ---
 
@@ -208,12 +211,17 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `AGENTS.md` | Reglas del repositorio y orden de lectura | Antes de tocar nada |
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones | Para entender el **que** |
 | `docs/ARQUITECTURA.md` | Stack, estructura, modelo de datos, despliegue y los **34 ADR** | Para entender el **como** |
-| `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-13** | Para saber que esta abierto |
+| `docs/DECISIONES-PENDIENTES.md` | Las 15 decisiones (cerradas), los pendientes y los **PP-01 a PP-14** | Para saber que esta abierto |
 | `docs/HU/INDICE.md` | Indice de historias de usuario y grafo de dependencias | Para planificar trabajo |
 | `docs/HU/HU-0*.md` | Historias de usuario completas | Antes de implementar una funcionalidad |
 | `SKILL.md` | Los **9 contratos de codigo**, el baseline de seguridad, las transacciones, las pruebas | Al escribir codigo. Es normativa |
 | `CHECKLIST.md` | Los **17 gates** de verificacion | Antes de dar algo por terminado |
 | `CONTRIBUTING.md` | Convencion de commits y pull requests | Al commitear |
+| `docs/ARRANQUE.md` | **Guia de arranque local**: requisitos, comandos, orden de trabajo | Al clonar y correr el proyecto |
+| `backend/` | Codigo de la API (FastAPI, hexagonal). `app/`, `tests/`, `api/` | Al tocar el backend |
+| `frontend/` | Codigo de la SPA (Vue 3.5, Vite 8). `src/`, `workers/` | Al tocar el frontend |
+| `supabase/` | `config.toml` y `migrations/*.sql`: el **esquema** del proyecto | Al tocar el modelo de datos |
+| `shared/` | Fixtures compartidas entre Python y TypeScript (casos dorados del chunking) | Al tocar el troceado |
 | `docs/legacy/` | Los documentos originales sin procesar | Solo como referencia historica. **No se editan** |
 
 ### 7.1 Orden de lectura para trabajar
@@ -255,7 +263,8 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 
 El repositorio completo, o en este orden: `README.md`, `AGENTS.md`, `docs/CONTEXTO.md`,
 `docs/ARQUITECTURA.md`, `docs/DECISIONES-PENDIENTES.md`, `docs/HU/`, `SKILL.md`,
-`CHECKLIST.md`.
+`CHECKLIST.md`, y despues `docs/ARRANQUE.md` y `backend/`/`frontend/` para revisar el
+esqueleto.
 
 **No se le debe dar ningun documento de cliente.** Este repositorio no los contiene.
 
@@ -269,7 +278,7 @@ Aqui esta el trabajo real. Una IA externa es util sobre todo para esto:
 | 2 | **Criterios sin cobertura** | Un RF sin HU, una HU sin criterio de aceptacion, un ADR sin efecto en el codigo |
 | 3 | **Huecos de seguridad** | Un permiso que nadie comprueba, un endpoint sin regla de RLS, un dato sensible sin `Resource` |
 | 4 | **Casos de error no contemplados** | Caminos tristes y "estupidos" ausentes en las HU |
-| 5 | **Supuestos que ya no se sostienen** | Los `[PROPUESTO]` y `[PENDIENTE]`: hoy son 13 (PP-01 a PP-13), mas los marcados en las HU |
+| 5 | **Supuestos que ya no se sostienen** | Los `[PROPUESTO]` y `[PENDIENTE]`: hoy son 14 (PP-01 a PP-14), mas los marcados en las HU |
 | 6 | **Consecuencias no escritas** | Una decision que tenga un efecto que nadie documento (por ejemplo, cambiar de motor cambia el chunking) |
 | 7 | **Riesgos de operacion** | Los limites de la plataforma free, la pausa de Supabase, la cobertura de WebGPU |
 | 8 | **Deuda de la v1** | Lo que se aplazo y si el aplazamiento sigue siendo valido |
@@ -279,10 +288,12 @@ Aqui esta el trabajo real. Una IA externa es util sobre todo para esto:
 Este prompt funciona tanto en Copilot Chat como en GPT:
 
 ```
-Revisa este repositorio de especificacion (leeme README.md primero).
+Revisa este repositorio (leeme README.md primero).
 
-Contexto: es la especificacion de una aplicacion web de analisis privado de documentos.
-FastAPI + Vue + Supabase. Todavia no hay codigo: todo es especificacion.
+Contexto: es un proyecto web de analisis privado de documentos. FastAPI + Vue + Supabase.
+La especificacion esta completa (25 RF, 34 ADR, 12 HU). El esqueleto de codigo existe y
+verifica, pero **todavia no hay logica de negocio**: ni endpoints, ni dominio, ni
+adaptadores. El codigo es solo la estructura y la configuracion.
 
 No propongas cambios de estilo ni reescribas texto. Busca:
 1. Contradicciones entre documentos (compara ADR, RF, HU y SKILL.md entre si).
@@ -316,11 +327,15 @@ Y el criterio de severidad que conviene darle:
 
 ## 10. Lo que viene ahora
 
-1. **El esqueleto**: `pyproject.toml`, estructura de carpetas, configuracion por entorno.
-2. **La migracion**: esquema con RLS, matriz de permisos y bucket privado, aplicada contra
+1. **La migracion**: esquema con RLS, matriz de permisos y bucket privado, aplicada contra
    una base **vacia** (no se acepta una migracion que nunca se ejecuto).
-3. **Los contratos**: entidades, puertos, casos de uso, envelope, errores.
+2. **Los contratos**: entidades, puertos, casos de uso, envelope, errores.
+3. **Los adaptadores**: Supabase (PostgREST), almacenamiento, correo.
 4. **Las pruebas**: traducidas de los criterios de aceptacion de cada HU.
+
+El esqueleto ya existe y verifica: `backend/` y `frontend/` instalan, compilan y pasan
+`ruff`, `mypy`, `lint-imports`, `pytest`, `eslint`, `vue-tsc` y `vitest`. La guia de
+arranque esta en [`docs/ARRANQUE.md`](docs/ARRANQUE.md).
 
 ---
 
