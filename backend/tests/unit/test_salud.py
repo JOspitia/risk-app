@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 from app.config import Config
 from app.main import crear_app
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def cliente() -> TestClient:

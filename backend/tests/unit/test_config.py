@@ -12,6 +12,8 @@ from pydantic import ValidationError
 
 from app.config import Config
 
+pytestmark = pytest.mark.unit
+
 
 class TestVariablesObligatorias:
     """Sin una variable obligatoria, la app no arranca."""
