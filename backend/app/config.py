@@ -43,7 +43,7 @@ class Config(BaseSettings):
         description="Llave publica. La usa el frontend; nunca la llave de servicio.",
     )
     supabase_service_role_key: str = Field(
-        description="Llave de servicio. Solo backend. Confineda al adaptador de administracion.",
+        description="Llave de servicio. Solo backend. Confinada al adaptador de administracion.",
     )
     supabase_jwt_secret: str | None = Field(
         default=None,
