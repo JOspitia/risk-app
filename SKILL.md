@@ -95,9 +95,9 @@ conservan; lo que cambia es el vocabulario y donde viven las interfaces.
 | Request | DTO de entrada | Esquema de entrada del adaptador | `adapters/http/schemas/` |
 | Controller | Router | **Adaptador de entrada** | `adapters/http/routers/` |
 | Service | Logica de negocio | **Caso de uso** | `application/use_cases/` |
-| Service interface | Contrato de servicio | **Puerto** del caso de uso | `application/ports/` |
+| Service interface | Contrato de servicio | **Puerto** del caso de uso | `domain/ports/` |
 | Repository interface | Contrato de datos | **Puerto de salida** | `domain/ports/` |
-| Repository impl | SQL | **Adaptador de salida** | `adapters/db/` |
+| Repository impl | SQL | **Adaptador de salida** | `adapters/supabase/` |
 | Model | Entidad | **Entidad de dominio** | `domain/entities/` |
 | Resource | DTO de salida | **Mapper de salida** | `adapters/http/schemas/` |
 | Response | Envelope | **Envelope de API** | `adapters/http/responses.py` |
@@ -679,7 +679,7 @@ los mapeadores de fila tienen que cambiar. Un desajuste aparece como un fallo en
 lejos de la edicion que lo causo.
 
 ```python
-# adapters/db/columnas.py
+# adapters/supabase/columnas.py
 COLUMNAS_DOCUMENTO = (
     "id, usuario_id, organizacion_id, nombre_archivo, hash_sha256, "
     "total_paginas, modo_procesamiento, estado, error_mensaje, "
@@ -2343,7 +2343,7 @@ sobre una API a medias absorbe cada hueco como si fuera su propio error.
 3. **Entidad de dominio.** Inmutable, sin concerns de serializacion, en `domain/entities/`.
 4. **Puertos.** En `domain/ports/`, solo los metodos que el caso de uso usa.
 5. **Gate de decision.** Crea solo lo que las respuestas exigen.
-6. **Implementacion del puerto.** En `adapters/db/`, con la constante de columnas
+6. **Implementacion del puerto.** En `adapters/supabase/`, con la constante de columnas
    compartida.
 7. **Caso de uso.** En `application/use_cases/`. La transaccion vive aqui.
 8. **Adaptador de entrada.** En `adapters/http/routers/`. Solo orquestacion.
