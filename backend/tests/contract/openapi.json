@@ -1,0 +1,322 @@
+{
+  "components": {
+    "schemas": {
+      "CierreSesionResource": {
+        "description": "Confirmacion del cierre de sesion.",
+        "properties": {
+          "revocado": {
+            "title": "Revocado",
+            "type": "boolean"
+          },
+          "session_id": {
+            "description": "Sesion revocada",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "revocado"
+        ],
+        "title": "CierreSesionResource",
+        "type": "object"
+      },
+      "DetalleError": {
+        "description": "Un error de la respuesta.\n\n`codigo` es el identificador estable que el cliente decide con (por\nejemplo `no_autenticado`); `detalle` es la explicacion para una persona.",
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "detalle": {
+            "title": "Detalle",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "detalle"
+        ],
+        "title": "DetalleError",
+        "type": "object"
+      },
+      "PerfilResource": {
+        "description": "Lo que el cliente ve del perfil.\n\nNo expone `auth.users`, ni el hash de la contrasena, ni el refresh token,\nni la llave de servicio. Solo lo que la HU-01 describe.",
+        "properties": {
+          "apellido_1": {
+            "title": "Apellido 1",
+            "type": "string"
+          },
+          "apellido_2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido 2"
+          },
+          "debe_cambiar_contrasena": {
+            "default": false,
+            "title": "Debe Cambiar Contrasena",
+            "type": "boolean"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "description": "Identificador del usuario",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "organizacion_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Organizacion efectiva del usuario. Nula si no pertenece a ninguna.",
+            "title": "Organizacion Id"
+          },
+          "rol": {
+            "description": "Rol efectivo del usuario",
+            "title": "Rol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombres",
+          "apellido_1",
+          "rol"
+        ],
+        "title": "PerfilResource",
+        "type": "object"
+      },
+      "Respuesta_CierreSesionResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CierreSesionResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[CierreSesionResource]",
+        "type": "object"
+      },
+      "Respuesta_PerfilResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerfilResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[PerfilResource]",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Analisis privado de documentos.",
+    "title": "Risk-app",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Cierra la sesion del usuario autenticado.\n\nRevoca el `session_id` del token, de modo que el token deja de servir de\ninmediato, sin esperar su expiracion natural (ADR-31). No necesita cuerpo:\nla sesion que se revoca es la del token.",
+        "operationId": "cerrar_sesion_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_CierreSesionResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cerrar Sesion",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "El perfil del usuario autenticado.\n\nResponde 200 con el perfil dentro del envelope. Responde 401 si no hay\ncredencial valida y 403 con el codigo `perfil_inexistente` si el usuario\nesta autenticado pero no tiene perfil.",
+        "operationId": "mi_perfil_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_PerfilResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mi Perfil",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Comprueba que el proceso esta vivo.\n\nDevuelve `200` con un cuerpo minimo. Deliberadamente **no** comprueba la\nconexion con Supabase: un fallo de la base de datos es un problema de la base de\ndatos, y un `/health` que depende de ella reportaria caido el servicio entero y\nel orquestador reiniciaria procesos que funcionan.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/health/config": {
+      "get": {
+        "description": "Comprueba que la configuracion se leyo y que los valores obligatorios\nexisten.\n\nNo devuelve ningun valor de configuracion: solo si estan presentes. Una ruta\nque devuelve la URL de Supabase o el emisor del JWT es una ruta que filtra\ninformacion de la infraestructura a cualquiera que la llame.",
+        "operationId": "health_config_health_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  "title": "Response Health Config Health Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Config",
+        "tags": [
+          "salud"
+        ]
+      }
+    }
+  }
+}
