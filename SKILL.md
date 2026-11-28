@@ -1347,7 +1347,13 @@ class Almacenamiento(Protocol):
 
     async def guardar(self, bucket: str, ruta: str, archivo: Archivo) -> str: ...
 
-    async def url_firmada(self, bucket: str, ruta: str, duracion_s: int) -> str: ...
+    # `como_descarga=True` pide la URL como adjunto (Content-Disposition: attachment),
+    # no para ver en linea. Un PDF con JavaScript embebido servido en linea se ejecuta
+    # en el origen del navegador: por eso la descarga de un documento es siempre
+    # una descarga, nunca una vista.
+    async def url_firmada(
+        self, bucket: str, ruta: str, duracion_s: int, *, como_descarga: bool = True
+    ) -> str: ...
 
     async def eliminar(self, bucket: str, ruta: str) -> None: ...
 ```
@@ -1355,7 +1361,9 @@ class Almacenamiento(Protocol):
 Implementaciones:
 
 - **Supabase Storage** (v1): bucket privado, RLS sobre `storage.objects`, clave del objeto
-  `{organizacion_id}/{usuario_id}/{documento_id}.pdf`.
+  `{organizacion_id}/{usuario_id}/{documento_id}.pdf`. La URL firmada de descarga se pide
+  **con la opcion de descarga** (`download=True`): sin ella, Supabase sirve el objeto en
+  linea.
 - **S3** o **SFTP** (futuro, si el cliente tiene los suyos): otro adaptador. Los casos de uso
   no cambian.
 
