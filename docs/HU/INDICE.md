@@ -105,9 +105,39 @@ HU-06.
   FAIL significa que la HU no esta lista.
 - **Al hacer la demo:** el camino feliz de cada HU arma el guion. Si una HU no esta, la demo
   pierde un paso.
-- **Al integrar el frontend:** el `CHECKLIST.md` gate 9 (listo para el frontend) verifica que
-  la API cumple lo que las HU prometen.
+- **Al integrar el frontend:** el gate 9 de `CHECKLIST.md` (listo para el frontend)
+  verifica que la API cumple lo que las HU prometen.
 
+### 4.1 Las HU guian; el checklist verifica
+
+Es la pregunta que mas se repite al retomar el proyecto: **¿sigo la HU o el gate?**
+
+**Las HU guian.** Son la unidad de trabajo: cada una describe un comportamiento del
+usuario, con su camino feliz, sus caminos de error y sus criterios de aceptacion. Se
+implementa **una HU**, no "un gate".
+
+**El checklist verifica.** Los gates no son una lista de trabajo: son **condiciones que
+deben cumplirse** para que lo implementado sea correcto. Un gate no se "implementa": se
+**marca** cuando el codigo que lo sustenta existe y esta verificado.
+
+> Un gate no es una tarea. Es una propiedad que el codigo tiene o no tiene.
+
+### 4.2 El ciclo
+
+```
+1. Elegir la HU siguiente (por el grafo de dependencias de la seccion 3)
+2. Implementar su comportamiento, con sus pruebas
+3. Verificar los gates que esa HU toca  ->  marcar [x] con la evidencia
+4. La HU esta lista cuando sus criterios de aceptacion dan PASS
+```
+
+El paso 3 es el que conecta las dos cosas: **al terminar una HU se activan los items del
+checklist que esa HU cubre**. No al revés.
+
+### 4.3 Donde esta la tabla de "que gate toca que HU"
+
+En [CHECKLIST.md](../../CHECKLIST.md), seccion **"Gates por HU"**. Es el unico lugar donde
+se ve, para todas las HU, que items del checklist se activan al cerrar cada una.
 ---
 
 ## 5. Trazabilidad

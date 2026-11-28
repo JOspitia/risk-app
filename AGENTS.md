@@ -59,6 +59,32 @@ Antes de escribir o modificar codigo:
   una rama y llega por pull request.
 - Cada commit que implemente un ADR o una HU lo referencia en el pie del mensaje.
 
+### 1.4 Como se trabaja: las HU guian, el checklist verifica
+
+Es la pregunta que mas se repite al retomar el proyecto, asi que la respuesta va aqui.
+
+**Las HU guian.** Son la unidad de trabajo. Cada una describe un comportamiento del
+usuario, con su camino feliz, sus caminos de error y sus criterios de aceptacion. Se
+implementa **una HU**, no "un gate".
+
+**El checklist verifica.** Un gate **no se implementa**: es una condicion que el codigo
+tiene o no tiene. Se marca `[x]` cuando el codigo que lo sustenta existe y esta
+verificado, con la evidencia al lado.
+
+El ciclo, en cuatro pasos:
+
+```
+1. Elegir la HU siguiente (por el grafo de dependencias de docs/HU/INDICE.md)
+2. Implementar su comportamiento, con sus pruebas
+3. Verificar los items del checklist que esa HU toca  ->  marcar [x] con la evidencia
+4. La HU esta lista cuando sus criterios de aceptacion dan PASS
+```
+
+El paso 3 es el que conecta las dos cosas: **al cerrar una HU se activan sus items**.
+Por eso el Gate 2 no se "hace": se cierra a lo largo de seis HU (HU-01, HU-02, HU-03,
+HU-06, HU-07, HU-09). El mapeo item por item esta en `CHECKLIST.md`, seccion
+**"Gates por HU"**.
+
 ---
 
 ## 2. Reglas que no se negocian

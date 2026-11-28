@@ -23,6 +23,71 @@ verificacion. Por eso los items `[x]` llevan la prueba al lado.
 
 ---
 
+## Gates por HU
+
+> **Que HU activa que items del checklist.** La HU es la unidad de trabajo; el gate es la
+> condicion que se cumple. Al cerrar una HU se activan sus items, y se marca `[x]` con la
+> evidencia.
+>
+> El grafo de dependencias esta en `docs/HU/INDICE.md` seccion 3.
+
+### El ciclo
+
+```
+1. Elegir la HU siguiente (por el grafo de dependencias)
+2. Implementar su comportamiento, con sus pruebas
+3. Verificar los items del checklist que esa HU toca  ->  marcar [x] con la evidencia
+4. La HU esta lista cuando sus criterios de aceptacion dan PASS
+```
+
+**Un gate no se implementa: se verifica.** Por eso no tiene sentido "hacer el gate 2":
+se hace **HU-01**, y al cerrarla se activan sus items del Gate 2.
+
+### Gate 2 — Seguridad, item por HU
+
+| Item del Gate 2 | HU que lo cierra | Cuando |
+|---|---|---|
+| La validacion del token usa el **JWKS del proyecto** | HU-01 | Con el adaptador de autenticacion |
+| La validacion del token comprueba firma, `exp`, `aud` y emisor | HU-01 | Con el adaptador de autenticacion |
+| Un token invalido, malformado o con firma adulterada devuelve 401, no 500 | HU-01 | Con las pruebas del adaptador |
+| `service_role` no se usa para atender peticiones de usuario final | HU-03 | Cuando exista el adaptador de administracion |
+| El rol del usuario se verifica en el caso de uso, no solo en el router | HU-02 | Con el caso de uso de permisos |
+| Un usuario de otra organizacion recibe 403 o 404, nunca datos | HU-02 | Con el caso de uso de permisos |
+| El cuerpo de ninguna respuesta contiene un hash ni una columna interna | HU-09 | Con los DTO de salida |
+| El tipo real del archivo se valida en el **navegador** (magic bytes) | HU-06 | En la carga del archivo |
+| El limite de tamano de archivo se aplica antes de leerlo en memoria | HU-06 | En la carga del archivo |
+| Los logs no contienen contenido del documento ni texto extraido | HU-07 | Con el pipeline de analisis |
+
+**El Gate 2 no se cierra de una vez.** Sus items se activan a lo largo de seis HU. El
+criterio de cierre del gate es: **no queda ningun item sin marcar**.
+
+### Que gate toca cada HU
+
+| HU | Gates que toca | Nota |
+|---|---|---|
+| HU-01 Acceso y sesion | 2, 5, 7, 8, 9 | La unica bloqueante de todas |
+| HU-02 Roles y permisos | 2, 3.1, 8, 9 | Depende de HU-01 |
+| HU-03 Administracion de usuarios | 2, 3.1, 3.3, 9 | Depende de HU-02 |
+| HU-04 Configuracion del motor | 7, 12 | No depende de la sesion |
+| HU-05 Compatibilidad y descarga | 7 | Depende de HU-04 |
+| HU-06 Carga y archivo | 1, 2, 3.4, 7, 8, 9 | Depende de HU-01 |
+| HU-07 Analisis del documento | 2, 3, 6, 7, 8, 10 | Depende de HU-06 |
+| HU-08 Seguimiento del trabajo | 3.2, 9 | Depende de HU-07 |
+| HU-09 Consulta de resultados | 2, 3.4, 4, 5, 8, 9, 10, 11 | Depende de HU-07 |
+| HU-10 Reanalisis | 4, 5, 8 | Depende de HU-09 |
+| HU-11 Plantillas de extraccion | 1, 7 | Va antes que HU-07 en la practica |
+| HU-12 Eliminacion del documento | 1, 3.4, 9 | La ultima: necesita el archivo de HU-06 |
+
+### Lo que ya esta cerrado
+
+| Gate | Items | Cuando |
+|---|---|---|
+| Gate 0 | 5 de 5 | Documentacion leida y planificada |
+| Gate 14 | 15 de 15 | Esqueleto construido y verificado |
+| Gate 15 | 9 de 9 | Documentacion al dia |
+
+---
+
 ## Gate 0 — Antes de escribir codigo
 
 - [x] Se leieron `docs/CONTEXTO.md`, `docs/ARQUITECTURA.md` y `docs/DECISIONES-PENDIENTES.md`
@@ -57,6 +122,12 @@ verificacion. Por eso los items `[x]` llevan la prueba al lado.
 ---
 
 ## Gate 2 — Seguridad
+
+> **Este gate se cierra por partes, no de una vez.** Sus items pertenecen a seis HU
+> distintas: cada item se activa al cerrar la HU que lo sustenta. El mapeo item por item
+> esta en la seccion **"Gates por HU"**, al principio de este documento.
+>
+> Los items marcados ya están verificados; los demas dependen de codigo que aun no existe.
 
 - [x] Ningun secreto en el codigo ni en `.env` versionado — `git check-ignore` cubre
       `.env`; el `.env.example` si se versiona

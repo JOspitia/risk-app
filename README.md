@@ -216,7 +216,7 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `docs/HU/HU-0*.md` | Historias de usuario completas | Antes de implementar una funcionalidad |
 | `docs/CONTRATO-RESULTADO-ANALISIS.md` | **La forma de un riesgo**: que envuelve a lo que el LLM extrae | Al implementar la extraccion o la comparacion de analisis |
 | `SKILL.md` | Los **9 contratos de codigo**, el baseline de seguridad, las transacciones, las pruebas | Al escribir codigo. Es normativa |
-| `CHECKLIST.md` | Los **19 gates** de verificacion. Los `[x]` llevan la evidencia al lado | Antes de dar algo por terminado |
+| `CHECKLIST.md` | Los **19 gates** de verificacion y la tabla **"Gates por HU"**. Los `[x]` llevan la evidencia al lado | Antes de dar algo por terminado |
 | `CONTRIBUTING.md` | Convencion de commits y pull requests | Al commitear |
 | `docs/ARRANQUE.md` | **Guia de arranque local**: requisitos, comandos, orden de trabajo | Al clonar y correr el proyecto |
 | `backend/` | Codigo de la API (FastAPI, hexagonal). `app/`, `tests/`, `api/` | Al tocar el backend |
