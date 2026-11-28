@@ -1,6 +1,6 @@
 """Composicion de la aplicacion: aqui se conectan las piezas.
 
-Este es el **unico** lugar donde seknown que existe FastAPI, que existen los
+Este es el **unico** lugar donde se sabe que existe FastAPI, que existen los
 adaptadores y que existen los casos de uso. Todo lo demas trabaja con puertos.
 
 El arranque **falla** si falta una variable de entorno obligatoria: una

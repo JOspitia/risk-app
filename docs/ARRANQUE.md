@@ -97,6 +97,21 @@ npm run api:types   # regenera src/api/types.ts desde el OpenAPI del backend
 **Un build no valida los tests.** `npm run build` compila las fuentes de
 produccion; los tests se corren aparte.
 
+### `npm run api:types` todavia no funciona
+
+El script genera `src/api/types.ts` desde el OpenAPI del backend:
+
+```
+npm run api:types    # lee backend/tests/contract/openapi.json
+```
+
+Ese archivo **aun no existe**: el snapshot de OpenAPI se genera cuando haya el primer
+endpoint. hasta entonces el comando falla, y es lo esperado. No es un error de
+configuracion.
+
+El archivo generado se versiona a proposito: un cambio de contrato se ve en el diff y
+no aparece solo en el momento de compilar.
+
 ---
 
 ## 4. Base de datos local
@@ -122,9 +137,44 @@ SUPABASE_SERVICE_ROLE_KEY=<la que imprime `supabase start`>
 DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
 ```
 
+### Lo que cambia en el proyecto de Supabase en la nube
+
+La base local tiene ajustes de desarrollo que **no** se replican tal cual:
+
+| Ajuste | Local | Nube | Por que |
+|---|---|---|---|
+| Confirmacion de correo | `enable_confirmations = false` | **Activada** | En local el correo se lee en el log (`inbucket`). En la nube llega al buzon real |
+| Correo de confirmacion al registrarse | No | **Si** | Es la unica prueba de que la direccion existe |
+| Cuentas creadas por la app | Con correo confirmado | Con correo confirmado | `[DECIDIDO]` en HU-03 §5: `email_confirm = true` |
+
+> **El correo se confirma siempre en las cuentas creadas por la app**, en local y en la
+> nube. La credencial temporal se envia junto con la confirmacion. Sin confirmar, el
+> `signInWithPassword` responde "Email not confirmed" y el usuario no puede entrar.
+
+La llave de servicio (`service_role`) nunca va en el frontend: viaja solo en las
+variables de entorno del backend.
+
 ---
 
-## 5. Orden de trabajo
+## 5. El primer administrador
+
+El proyecto arranca sin usuarios. El primer admin se crea con el script de bootstrap,
+que es **idempotente**: si el correo ya existe, no falla ni duplica.
+
+```bash
+cd backend
+uv run python -m scripts.bootstrap_admin --correo admin@ejemplo.com --organizacion "<nombre>"
+```
+
+El script usa la llave de servicio: es el unico lugar del backend, junto al adaptador de
+administracion de usuarios, que puede usar `service_role`.
+
+> El script llega con el bloque de migracion, junto con `supabase/seed.sql`. En el
+> esqueleto todavia no existe.
+
+---
+
+## 6. Orden de trabajo
 
 El proyecto es incremental y cada capa se apoya en la anterior:
 

@@ -17,6 +17,3 @@ htmlcov/
 .env
 .env.*
 !.env.example
-
-# Configuracion local de Supabase
-supabase/.temp/

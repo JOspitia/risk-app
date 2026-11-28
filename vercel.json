@@ -6,7 +6,8 @@
   "installCommand": "npm ci --legacy-peer-deps",
   "functions": {
     "backend/api/index.py": {
-      "runtime": "vercel-python@3.14"
+      "maxDuration": 60,
+      "excludeFiles": "{tests/**,**/*.test.py,fixtures/**}"
     }
   },
   "rewrites": [
