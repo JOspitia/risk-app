@@ -787,8 +787,8 @@ directamente una tabla que tenga RLS**. Cuando hace falta, la consulta va por un
 de `security`. asi el ciclo no puede formarse.
 
 **La segunda mitad de la historia: quien puede llamar a las funciones.** `[DECIDIDO]`
-El esquema `security` no solo evita la recursion: **tambien saca las funciones del
-alcance de `anon`**. Es la misma decision por dos razones distintas, y conviene no
+El esquema `security` no solo evita la recursion: **tambien saca del alcance de `anon` a
+las funciones de apoyo**. Es la misma decision por dos razones distintas, y conviene no
 confundirlas.
 
 `public` es el esquema que el Data API expone. El rol `anon` es el que atiende las
@@ -825,6 +825,90 @@ aplique **tambien al dueno** de las tablas: sin eso, cualquier consulta con
 > `authenticated`. Verificado el 2026-11-28, cuando la primera version de la
 > migracion lo hizo y las politicas quedaron sin permiso para invocar
 > `organizacion_activa`.
+
+### 5.2.1 Las funciones RPC: en `public`, con el ACL cerrado
+
+`[DECIDIDO]` Las cinco funciones RPC de negocio (`guardar_analisis`,
+`registrar_actividad`, `actualizar_trabajo`, `mis_permisos`, `revocar_sesion`) **viven en
+`public`**, y su ACL deja `EXECUTE` solo a `authenticated` y `service_role`. No es una
+reversion de ADR-36: es la continuacion de esa decision, y el motivo esta en como
+funciona PostgREST.
+
+**Por que en `public`.** PostgREST solo resuelve funciones de los esquemas que expone, y
+su lista por defecto es `public`. Una funcion en `security` **no es invocable por HTTP**:
+la ruta `rpc/<nombre>` no acepta el esquema, y las variantes (`rpc/security.mis_permisos`,
+`rpc/public.mis_permisos`) tampoco funcionan. Verificado el 2026-11-28 contra el
+proyecto en la nube: la migracion 008 dejo las cinco RPC en `security` y la respuesta
+fue
+
+```
+POST /rest/v1/rpc/mis_permisos
+400 PGRST202: Searched for the function public.mis_permisos ... no matches were found
+```
+
+Habria dos caminos que no tocan el codigo: configurar `extra_search_path` o
+`db_schemas` en el panel de cada proyecto. Los dos se descartan porque **dependen de
+una intervencion manual que no queda en el repo**: un `supabase db reset`, un proyecto
+nuevo o un despliegue desde cero los pierde. Este proyecto despliega por migraciones
+versionadas (ADR-32), asi que lo que no esta en una migracion no esta desplegado.
+
+ADR-04 dice que el acceso a datos es por HTTP (PostgREST/RPC). Devolver las funciones a
+`public` es lo que hace que esa decision sea ejecutable.
+
+**Por que siguen cerradas para `anon`.** `[DECIDIDO]` El ACL de una funcion tiene que
+quedar asi:
+
+```
+{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+```
+
+Sin el `=X` de la izquierda, que es el rol `public` (cualquier rol). Y con un `revoke`
+**a `anon` explicitamente**, no solo a `public`: un privilegio concedido directamente a
+un rol sobrevive a un `revoke` hecho sobre el rol del que ese rol hereda. Verificado el
+2026-11-28 en el stack local: con el `revoke` solo sobre `public`, el ACL de las cinco
+quedaba `{postgres=X,anon=X,authenticated=X,service_role=X}` y `set role anon` las
+ejecutaba sin error.
+
+La proteccion real de estas funciones no es el ACL: es que **todas son `security definer`
+con `set row_security = off` y comprueban la pertenencia en su propio cuerpo**
+(`auth.uid()`, `security.usuario_tiene_permiso(...)`). Una funcion a la que se llegue sin
+sesion no puede hacer nada util: lo unico que hace es fallar la comprobacion interna y
+devolver un error. El ACL evita el ruido; el cuerpo de la funcion es la puerta.
+
+**El aviso del linter de Supabase.** `[DECIDIDO]` El linter 0029
+(`authenticated_security_definer_function_executable`) marca las cinco funciones de
+`public` que son `security definer` y que `authenticated` puede ejecutar. **El aviso es
+intencional y se acepta.** La propia remediacion del linter dice: muevala fuera del
+esquema expuesto **solo si los usuarios con sesion no deberian poder llamarla**. Aqui si
+deben llamarlas, porque son la via de escritura del pipeline (ADR-04, ADR-25) y la via de
+lectura de los permisos del usuario. Es un aviso estructural, no un defecto: cualquier
+RPC de negocio que se exponga a usuarios autenticados va a aparecer.
+
+**Lo que si se cierra del todo.** `[DECIDIDO]` El esquema `security` **se queda** y es
+donde viven las nueve funciones de apoyo de las politicas (`organizacion_activa`,
+`es_usuario_activo`, `usuario_tiene_permiso`, `es_miembro_de`, `documento_visible`,
+`documento_compartido_conmigo`, `documento_es_mio`, `documento_de_mi_organizacion`,
+`trabajo_es_mio`). Esas si necesitan el esquema separado: su problema es la recursion de
+RLS (ADR-35), no la exposicion por HTTP. De ellas se revoca `USAGE` al esquema y
+`EXECUTE` a `public` **y a `anon` explicitamente**, y se concede a `authenticated`.
+
+Verificado el 2026-11-28 en la nube (`has_function_privilege`):
+
+| Comprobacion | `anon` | `authenticated` |
+|---|---|---|
+| `public.mis_permisos()` | `false` | `true` |
+| `public.guardar_analisis(...)` | `false` | `true` |
+| `public.revocar_sesion(...)` | `false` | `true` |
+| `security.organizacion_activa()` | `false` | `true` |
+| `USAGE` sobre el esquema `security` | `false` | `true` |
+
+Y el comportamiento por HTTP, con la publishable key y con el JWT del admin:
+
+| Peticion | Sin token | Con JWT |
+|---|---|---|
+| `POST /rest/v1/rpc/mis_permisos` | `401` `42501 permission denied` | `200`, los 14 permisos del rol `admin` |
+| `POST /rest/v1/rpc/revocar_sesion` | `401` `42501 permission denied` | `403` `42501` si la sesion es de otro usuario |
+| `GET /rest/v1/perfiles` | `200`, 0 filas | `200`, 1 fila |
 
 
 
@@ -1887,7 +1971,8 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-33 | El aislamiento se resuelve desde `organizaciones_miembros`, y el esquema se completa con las tablas que las historias ya exigian | 2026-11-27 | Aceptada | `perfiles.organizacion_id` es un solo campo, pero un usuario puede pertenecer a varios equipos: una politica que se apoyara en el perfil le daria acceso a la otra organizacion. Y `organizaciones_miembros` no cubre el caso de un `analista` sin `analisis.ver_todos`, que por la puerta de PostgREST leeria los documentos de sus companeros: la matriz de permisos se esquivaba. El DDL, ademas, estaba desincronizado con las historias: faltaban la tabla de auditoria, la de compartidos, la de sesiones revocadas y varias columnas. Como el esquema todavia no existe en ninguna base, se corrige ahora |
 | ADR-34 | Editar una plantilla de extraccion crea una version nueva; la anterior se conserva | 2026-11-27 | Aceptada | Los analisis guardan la version de plantilla que usaron. Si la plantilla se modificara en el sitio, un analisis de hace tres meses quedaria explicando con reglas que ya no son las que se aplicaron, y no habria forma de reconstruir cual era. Versionar tambien permite volver a una version anterior. El precio es una tabla que crece, y una version activa unica garantizada con un indice parcial |
 | ADR-35 | Las funciones de apoyo de las politicas RLS viven en el esquema `security`, con `set row_security = off` | 2026-11-28 | Aceptada | Sin esto, las politicas se recursionan: la de `perfiles` llama a la que comprueba si el usuario esta activo, que a su vez consulta `perfiles`. Postgres aborta con `stack depth limit exceeded` y, cuando una politica falla en error, la fila **no** se filtra: el aislamiento queda anulado en silencio. Mover las funciones a otro esquema no basta, porque una `security definer` sigue disparando las politicas de las tablas que consulta (`authenticated` no tiene `BYPASSRLS`). `set row_security = off` hace que el propietario de la funcion lea los datos crudos, sin reevaluar la politica. Verificado el 2026-11-28 contra la base local |
-| ADR-36 | Las funciones RPC viven en el esquema `security` y solo `authenticated` puede llamarlas | 2026-11-28 | Aceptada | `public` es el esquema que el Data API expone, y el rol `anon` (el que atiende las peticiones sin token) puede llamar a cualquier funcion de `public` sobre la que tenga `EXECUTE`. Las cinco funciones RPC eran `security definer`, asi que se ejecutaban con los privilegios del dueno (`postgres`, con `BYPASSRLS`) y **el RLS no las protegia**: no era el RLS quien decidia, era la funcion. Verificado el 2026-11-28: `revocar_sesion` permitia a un visitante sin sesion revocar la sesion de cualquier usuario que conociera su `session_id` (que viaja en el JWT). Se mueven al esquema `security` y se revoca `EXECUTE` a `anon`. Se acompana de `FORCE ROW LEVEL SECURITY`, que hace que el RLS aplique tambien al dueno de las tablas |
+| ADR-36 | Las funciones RPC se apartan del alcance del rol `anon`, y `FORCE ROW LEVEL SECURITY` se activa en las 17 tablas | 2026-11-28 | Aceptada, **parcialmente superada por ADR-37** | `public` es el esquema que el Data API expone, y el rol `anon` (el que atiende las peticiones sin token) puede llamar a cualquier funcion de `public` sobre la que tenga `EXECUTE`. Las cinco funciones RPC eran `security definer`, asi que se ejecutaban con los privilegios del dueno (`postgres`, con `BYPASSRLS`) y **el RLS no las protegia**: no era el RLS quien decidia, era la funcion. Verificado el 2026-11-28: `revocar_sesion` permitia a un visitante sin sesion revocar la sesion de cualquier usuario que conociera su `session_id` (que viaja en el JWT). Se apartaron del alcance de `anon` y se activo `FORCE ROW LEVEL SECURITY`, que hace que el RLS aplique tambien al dueno de las tablas. **Lo que no surtio: moverlas al esquema `security` resulto incompatible con la invocacion por HTTP** (ver ADR-37) |
+| ADR-37 | Las funciones RPC de negocio vuelven al esquema `public`, con `EXECUTE` revocado a `public` y a `anon`, y solo para `authenticated` | 2026-11-28 | Aceptada | ADR-36 movio las cinco RPC al esquema `security` para sacarlas del alcance de `anon`. El efecto secundario fue que **dejaron de ser invocables por HTTP**: PostgREST solo resuelve funciones de los esquemas que expone, y su lista por defecto es `public`; la ruta `rpc/<nombre>` no acepta el esquema. Verificado el 2026-11-28 en la nube: `POST /rest/v1/rpc/mis_permisos` respondia `PGRST202`. Se descartaron las dos alternativas que no tocan el codigo (`extra_search_path` y `db_schemas` en el panel) porque dependen de una intervencion manual que no queda en el repo: un `supabase db reset` o un proyecto nuevo las pierde, y este proyecto despliega por migraciones versionadas (ADR-32). Vuelven a `public` con el ACL cerrado. La clave del ACL es que hay que revocar **a `anon` explicitamente**, no solo a `public`: un privilegio concedido directamente a un rol sobrevive a un `revoke` hecho sobre el rol del que hereda. Verificado el 2026-11-28 en local, donde con el `revoke` solo sobre `public` el ACL de las cinco quedaba `{postgres=X,anon=X,authenticated=X,service_role=X}` y `set role anon` las ejecutaba sin error. El aviso del linter 0029 (`authenticated_security_definer_function_executable`) se acepta como intencional: la propia remediacion del linter dice que la funcion se mueva fuera del esquema expuesto **solo si los usuarios con sesion no deberian poder llamarla**, y aqui si deben llamarlas. La proteccion real no es el ACL sino que cada funcion comprueba la pertenencia en su cuerpo (`auth.uid()`, `security.usuario_tiene_permiso(...)`) |
 
 ### 10.1 Como se registra una decision nueva
 

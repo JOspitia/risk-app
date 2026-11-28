@@ -59,7 +59,7 @@ ejecuta en el navegador del usuario.
 | **Esqueleto del proyecto** | **Listo.** Backend y frontend instalan, compilan y verifican |
 | **Migracion de base de datos** | **Lista.** Esquema, RLS, permisos, bucket y funciones RPC, aplicados contra una base **vacia** y verificados con usuarios reales |
 | **Advisor de Supabase** | **Sin ERROR ni WARN.** De 56 hallazgos a 29, y los 29 que quedan son de nivel INFO (indices sin uso en una base vacia) |
-| **Aislamiento** | **Verificado con usuarios reales.** RLS en las 17 tablas, `FORCE ROW LEVEL SECURITY`, y las funciones RPC fuera del alcance del rol `anon` |
+| **Aislamiento** | **Verificado con usuarios reales.** RLS en las 17 tablas, `FORCE ROW LEVEL SECURITY`, y las funciones RPC con `EXECUTE` revocado al rol `anon` |
 | Logica de negocio | **No existe todavia.** Sin endpoints, sin dominio, sin adaptadores |
 | Pendientes documentados | 15 (PP-01 a PP-15) |
 
@@ -337,16 +337,16 @@ Y el criterio de severidad que conviene darle:
 3. **Los adaptadores**: Supabase (PostgREST), almacenamiento, correo.
 4. **Las pruebas**: traducidas de los criterios de aceptacion de cada HU.
 
-> La migracion ya esta hecha: `supabase/migrations/` tiene las siete migraciones
-> (esquema, RLS, permisos, bucket, funciones RPC y dos de correccion del advisor) y
-> `supabase/seed.sql` siembra la plantilla generica v1. Se aplicaron con
-> `supabase db reset` contra una base vacia y el aislamiento por organizacion se
-> verifico con dos usuarios reales en equipos distintos. El script
+> La migracion ya esta hecha: `supabase/migrations/` tiene las once migraciones
+> (esquema, RLS, permisos, bucket, funciones RPC, dos de correccion del advisor y
+> tres de cierre de permisos) y `supabase/seed.sql` siembra la plantilla generica v1.
+> Se aplicaron con `supabase db reset` contra una base vacia y **contra el proyecto
+> `risk-app` en la nube** (`tygzjraxknlwyllkabid`), con `supabase db push --remote`.
+> El aislamiento por organizacion se verifico con dos usuarios reales en equipos
+> distintos, en local y en la nube. El script
 > `backend/scripts/bootstrap_admin.py` crea el primer administrador. El `Dockerfile`
 > del backend construye una imagen de 337 MB que arranca como usuario sin
-> privilegios. Falta ejecutar `supabase db push` contra el proyecto de Supabase en
-> la nube: hace falta el **project ref**, un **access token** y la contrasena de la
-> base de datos. La guia esta en `docs/ARRANQUE.md` seccion 7.
+> privilegios. La guia esta en `docs/ARRANQUE.md` seccion 7.
 
 El esqueleto ya existe y verifica: `backend/` y `frontend/` instalan, compilan y pasan
 `ruff`, `mypy`, `lint-imports`, `pytest`, `eslint`, `vue-tsc` y `vitest`. La guia de

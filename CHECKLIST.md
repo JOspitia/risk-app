@@ -83,7 +83,7 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 | Gate | Items | Cuando |
 |---|---|---|
 | Gate 0 | 5 de 5 | Documentacion leida y planificada |
-| Gate 1 | 10 de 11 | Esquema, RLS, permisos, bucket y funciones, aplicados y verificados. El item de `supabase db push` queda parcial: falta el proyecto en la nube |
+| Gate 1 | 11 de 11 | Esquema, RLS, permisos, bucket y funciones, aplicados y verificados contra la base local y contra el proyecto en la nube |
 | Gate 14 | 15 de 15 | Esqueleto construido y verificado |
 | Gate 15 | 9 de 9 | Documentacion al dia |
 
@@ -115,10 +115,13 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 - [x] **Una sola herramienta de migraciones**: SQL en `supabase/migrations/`. No hay Alembic
       ni tabla `alembic_version` (ADR-32) — verificado: `supabase db reset` aplica el SQL
       del directorio y no existe tabla `alembic_version`
-- [~] `supabase db push` aplica el mismo esquema en el proyecto de Supabase que el que se
-      valido en local — **pendiente de la cuenta**: falta crear el proyecto en Supabase y
-      tener `SUPABASE_URL` y las claves. El esquema es el mismo (mismo directorio), pero
-      no se ha ejecutado contra el proyecto real
+- [x] `supabase db push` aplica el mismo esquema en el proyecto de Supabase que el que se
+      valido en local — verificado el 2026-11-28 contra el proyecto `risk-app`
+      (`tygzjraxknlwyllkabid`): las 11 migraciones aplicadas con `supabase db push
+      --remote`, y el historial de `supabase_migrations.schema_migrations` en la nube
+      muestra las 11. El estado verificado en la nube: 17 tablas con RLS, 17 con
+      `FORCE ROW LEVEL SECURITY`, 49 politicas, 14 permisos, 3 roles, 1 plantilla, y
+      el bucket `documentos` privado
 - [x] No hay auto-baseline activado fuera de adopcion de produccion — verificado: no hay
       ninguna referencia a `alembic` ni a `pg_dump` versionado en el repositorio
 - [x] Ninguna migracion ya aplicada fue editada despues — verificado: el historial de
@@ -145,8 +148,24 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
       `security definer`, asi que el rol `anon` (peticiones sin token) podia
       llamarlas y ejecutarlas con los privilegios del dueno, saltandose el RLS.
       Comprobado: `revocar_sesion` permitia a un visitante sin sesion revocar la
-      sesion de cualquier usuario que conociera su `session_id`. Ahora viven en el
-      esquema `security` y `anon` no tiene `EXECUTE` sobre ninguna (ADR-36)
+      sesion de cualquier usuario que conociera su `session_id`.
+      Ahora viven en `public` con el ACL cerrado y `anon` no tiene `EXECUTE` sobre
+      ninguna (ADR-37). Comprobado en la nube con `has_function_privilege`: `anon` da
+      `false` en las cinco y `authenticated` da `true`. Por HTTP, con la publishable
+      key y sin token: `POST /rest/v1/rpc/mis_permisos` responde `401` con el codigo `42501`; con el JWT
+      del admin responde `200` con los 14 permisos del rol `admin`
+- [x] Las **funciones RPC son invocables por HTTP** — verificado el 2026-11-28: al
+      moverlas al esquema `security` (ADR-36) dejaron de serlo, porque PostgREST solo
+      resuelve funciones de los esquemas que expone y su lista por defecto es
+      `public`. La respuesta era `PGRST202`. Vuelven a `public` con el ACL cerrado
+      (ADR-37). Comprobado en la nube: `POST /rest/v1/rpc/mis_permisos` responde `200`
+      con sesion y `401` sin sesion; `POST /rest/v1/rpc/revocar_sesion` responde `403`
+      `42501` cuando la sesion es de otro usuario
+- [x] El **esquema `security` queda fuera del alcance de `anon`** — verificado el
+      2026-11-28 en la nube: `has_schema_privilege('anon', 'security', 'usage')` da
+      `false` y `has_function_privilege('anon', 'security.organizacion_activa()',
+      'execute')` da `false`, mientras `authenticated` da `true` en ambos. El ACL del
+      esquema queda `{postgres=UC/postgres,authenticated=U/postgres}`
 - [x] `FORCE ROW LEVEL SECURITY` en las 17 tablas — verificado el 2026-11-28: sin
       esta linea, el dueno de la tabla (`postgres`, con `BYPASSRLS`) no respeta el
       RLS. Las funciones privilegiadas siguen leyendo lo que necesitan porque
@@ -168,6 +187,17 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
         (`bloques_documento_idx`, `analisis_documento_idx`). Los demas se quedan: el
         advisor los ve sin uso porque la base esta vacia y el planificador no tiene
         datos para decidir
+- [x] El advisor **no reporta hallazgos de nivel ERROR ni WARN** en el proyecto en la
+      nube — verificado el 2026-11-28 con `supabase db advisors --remote --type all
+      --level warn`. Quedan 6 avisos de nivel WARN que son **intencionales y
+      documentados** (ADR-37):
+      - `authenticated_security_definer_function_executable` (5): las cinco RPC de
+        negocio son `security definer` en `public` y `authenticated` debe poder
+        llamarlas. La propia remediacion del linter dice: muevala fuera del esquema
+        expuesto **solo si los usuarios con sesion no deberian poder llamarla**. Aqui
+        si deben llamarlas
+      - `auth_leaked_password_protection` (1): opcion de Supabase Auth (HaveIBeenPwned).
+        Es una configuracion del panel, no del esquema
 
 ---
 
