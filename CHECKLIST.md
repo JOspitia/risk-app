@@ -9,15 +9,32 @@
 
 ---
 
+## Como leer las casillas
+
+| Marca | Significado |
+|---|---|
+| `[x]` | **Verificado con evidencia.** La evidencia esta en la linea o en el comentario |
+| `[ ]` | Pendiente |
+| `[~]` | **Parcial.** Parte se cumple y parte no. Dice cual |
+| `[-]` | **Aplazado.** No aplica en esta fase, con el motivo y donde vive |
+
+Una casilla marcada sin evidencia **no cuenta como cumplida**: es una promesa, no una
+verificacion. Por eso los items `[x]` llevan la prueba al lado.
+
+---
+
 ## Gate 0 — Antes de escribir codigo
 
-- [ ] Se leyeron `docs/CONTEXTO.md`, `docs/ARQUITECTURA.md` y `docs/DECISIONES-PENDIENTES.md`
-- [ ] Los ADR aplicables a la iteracion estan identificados en la tabla de
-      `docs/ARQUITECTURA.md` seccion 10
-- [ ] Las preguntas abiertas que tocan el alcance estan resueltas o el supuesto esta
-      anotado en el ADR
-- [ ] El alcance de la iteracion esta escrito en una frase
-- [ ] Los pasos 1 a 10 del "Quick start" de `SKILL.md` estan planeados
+- [x] Se leieron `docs/CONTEXTO.md`, `docs/ARQUITECTURA.md` y `docs/DECISIONES-PENDIENTES.md`
+      — los tres vigentes, leidos al escribir cada HU y cada ADR
+- [x] Los ADR aplicables a la iteracion estan identificados en la tabla de
+      `docs/ARQUITECTURA.md` seccion 10 — 34 ADR; cada commit referencia el suyo al pie
+- [x] Las preguntas abiertas que tocan el alcance estan resueltas o el supuesto esta
+      anotado en el ADR — 15 DP cerradas; las 14 PP (PP-01 a PP-14) tienen supuesto explicito
+- [x] El alcance de la iteracion esta escrito en una frase — seccion 1 de cada HU, y el
+      cuerpo de cada PR
+- [x] Los pasos 1 a 10 del "Quick start" de `SKILL.md` estan planeados — `SKILL.md`
+      seccion 3; el orden concreto en `docs/ARRANQUE.md` seccion 6
 
 ---
 
@@ -41,14 +58,17 @@
 
 ## Gate 2 — Seguridad
 
-- [ ] Ningun secreto en el codigo ni en `.env` versionado
-- [ ] El arranque **falla** si falta `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-      `SUPABASE_SERVICE_ROLE_KEY` u otra variable obligatoria
+- [x] Ningun secreto en el codigo ni en `.env` versionado — `git check-ignore` cubre
+      `.env`; el `.env.example` si se versiona
+- [x] El arranque **falla** si falta `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+      `SUPABASE_SERVICE_ROLE_KEY` u otra variable obligatoria — comprobado: sin `.env`,
+      `Config` lanza `ValidationError` nombrando las variables que faltan
 - [ ] La validacion del token usa el **JWKS del proyecto** (`{SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
       no un secreto simetrico. `SUPABASE_JWT_SECRET` solo aplica a proyectos con claves
       simetricas (HS256) y es opcional (ADR-31)
 - [ ] `service_role` no se usa para atender peticiones de usuario final
-- [ ] `service_role` nunca se expone al frontend ni viaja en el bundle
+- [x] `service_role` nunca se expone al frontend ni viaja en el bundle — solo viajan
+      variables `VITE_*` publicas
 - [ ] La validacion del token comprueba firma, `exp`, `aud` y emisor
 - [ ] Un token invalido, malformado o con firma adulterada devuelve 401, no 500
 - [ ] El cuerpo de ninguna respuesta contiene un hash de contrasena, un hash de token ni
@@ -60,20 +80,23 @@
       validar magic bytes: nunca ve el archivo (ver I-07 del informe de validacion)
 - [ ] El limite de tamano de archivo se aplica antes de leerlo en memoria
 - [ ] Los logs no contienen contenido del documento ni texto extraido
-- [ ] CORS no es `*` en un entorno con credenciales
+- [x] CORS no es `*` en un entorno con credenciales — `Config` **rechaza** `"*"` al
+      arrancar, con el motivo explicito
 
 ---
 
 ## Gate 3 — Arquitectura (dependencias)
 
-- [ ] `domain/` no importa nada de `adapters/`, `application/` ni de frameworks
-      (verificable con `import-linter`)
+- [x] `domain/` no importa nada de `adapters/`, `application/` ni de frameworks
+      (verificable con `import-linter`) — `lint-imports`: 4 contratos, 0 rotos
 - [ ] Ningun router (adaptador de entrada) llama a un repositorio directamente
 - [ ] Ningun caso de uso construye schemas de HTTP ni conoce `Request`/`Response`
 - [ ] Ningun error de dominio se captura y se reenvuelve en un error generico
-- [ ] Los puertos los define el dominio, no la infraestructura
+- [x] Los puertos los define el dominio, no la infraestructura — `domain/ports/`, con
+      `import-linter` verificando que el dominio no importa hacia afuera
 - [ ] Cada puerto declarado tiene al menos una implementacion en `adapters/`
-- [ ] No hay puertos para librerias de terceros que no van a cambiar
+- [x] No hay puertos para librerias de terceros que no van a cambiar — solo
+      persistencia, motor LLM, almacenamiento, cola y reloj (ARQUITECTURA.md 2.4)
 
 ---
 
@@ -171,7 +194,8 @@
 - [ ] Los booleanos son `true`/`false`, no `0`/`1` ni `"true"`
 - [ ] Los nulos son `null` explicito, no claves ausentes ni `"null"`
 - [ ] La paginacion devuelve metadatos, no un array desnudo
-- [ ] `page` por defecto 1, `size` por defecto 20, maximo 100, recortado y no rechazado
+- [x] `page` por defecto 1, `size` por defecto 20, maximo 100, recortado y no rechazado —
+      el caso de uso recorta el tamano en lugar de rechazar la peticion
 
 ---
 
@@ -180,7 +204,8 @@
 - [ ] Un PDF sin capa de texto se marca como error explicito, no como analisis vacio
 - [ ] El hash `sha256` del archivo se calcula y se persiste
 - [ ] Los bloques cubren todas las paginas sin huecos fuera del solapamiento configurado
-- [ ] **El tamano de bloque se deriva de la ventana de contexto del modelo**, no esta fijo
+- [x] **El tamano de bloque se deriva de la ventana de contexto del modelo**, no esta fijo —
+      `floor((ventana - reservados) / tokens_por_pagina)`, sin numeros magicos (`SKILL.md` 10.2)
 - [ ] La funcion de chunking del frontend y la del backend son **el mismo algoritmo** (los
       rangos de pagina persistidos coinciden con los calculados)
 - [ ] El Reduce es **jerarquico**: los resumenes parciales se agrupan en lotes que caben en
@@ -224,8 +249,11 @@
 - [ ] La asercion de limpieza es explicita: "no 500" no basta, la tabla debe seguir existiendo
 - [ ] La concurrencia (N altas simultaneas, N escrituras sobre la misma fila) no produce
       perdidas de escritura ni 500
-- [ ] El comando de build/test **incluye** las pruebas, no solo las fuentes de produccion
-- [ ] La suite se reejecuto desde limpio y se reconstruyo de verdad
+- [x] El comando de build/test **incluye** las pruebas, no solo las fuentes de produccion —
+      `npm run build` = `vue-tsc` + `vite build`, y `npm run test` va aparte: documentado
+      para que nadie confunda "compila" con "probado"
+- [x] La suite se reejecuto desde limpio y se reconstruyo de verdad — clon limpio del
+      remoto: `uv sync` + `npm ci` + suites completas en verde
 
 ---
 
@@ -257,10 +285,12 @@
 - [ ] Ningun texto extraido aparece en logs, traces ni metricas
 - [ ] Ningun texto extraido se persiste fuera de `datos_estructurados` y `resumen`, que son
       los resultados que el usuario pidio
-- [ ] El bundle del frontend no contiene ninguna llave secreta
+- [x] El bundle del frontend no contiene ninguna llave secreta — solo variables `VITE_*`
+      publicas; el `.env` no se versiona
 - [ ] El codigo del adaptador de LLM no tiene ningun destino por defecto que sea una API de
       terceros
-- [ ] El `service_role` no se usa para atender peticiones de usuario final
+- [x] El `service_role` no se usa para atender peticiones de usuario final — ADR-33: queda
+      confinado a `adapters/supabase/admin.py` y al script de bootstrap
 
 ## Gate 11 — Despliegue
 
@@ -269,15 +299,18 @@
       para que la migracion a Cloudflare Workers sea posible sin cambios
 - [ ] Las funciones de Postgres con `security definer` comprueban el permiso **dentro** de la
       funcion, y tienen `set search_path = public`
-- [ ] `vercel.json` fija el `maxDuration` por ruta de forma explicita, y excluye los tests del
+- [x] `vercel.json` fija el `maxDuration` por ruta de forma explicita, y excluye los tests del
       bundle (`excludeFiles`). La **version de Python no se declara en el `vercel.json`**: la
-      define el `requires-python` del `pyproject.toml`
+      define el `requires-python` del `pyproject.toml` — configurado y verificado
 - [ ] Ningun endpoint del camino principal acepta un cuerpo mayor a 4.5 MB
 - [ ] La API responde en menos de 300 s con la carga esperada (limite por defecto de la
       funcion)
 - [ ] El `Dockerfile` construye y la imagen levanta el backend en local
 - [ ] Las variables de entorno del entorno de produccion estan definidas en el proveedor,
       no en un archivo versionado
+- [x] Las **dependencias tienen pin exacto** y coinciden con lo instalado — ADR-27: un
+      stack que se mueve solo es un stack que se rompe en silencio. Verificado en los dos
+      lados contra `node_modules` y el `.venv`
 
 **Perfil de demo gratuita** (solo si el despliegue es con planes gratuitos):
 
@@ -310,7 +343,147 @@ cambio de proveedor es un cambio de codigo en los casos de uso.**
 
 ---
 
+## Gate 13 — Ciclo de vida del riesgo (fase 2)
+
+> **Este gate no aplica en la v1.** La v1 entrega el analisis: extrae, consolida y
+> persiste. Este gate verifica la fase siguiente, en la que el resultado **se gestiona**.
+>
+> **Esta aplazado hasta que PP-15 se cierre.** La pregunta "el resultado tiene ciclo de
+> vida o es solo una consulta" es del cliente. Si la respuesta es "es solo una consulta",
+> este gate se elimina. Si es "se gestiona", se convierte en gates nuevos de permisos y
+> seguimiento.
+>
+> El material de este gate viene de dos fuentes:
+> - `docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md` — el analisis del prototipo de
+>   referencia que mostro la forma que tiene un resultado cuando alguien lo gestiona.
+> - `docs/CONTRATO-RESULTADO-ANALISIS.md` — el contrato del resultado, ya definido.
+
+### 13.1 Modelo de datos
+
+- [ ] **PP-15 esta cerrada** y la respuesta esta escrita en `DECISIONES-PENDIENTES.md`
+- [ ] El modelo de datos del riesgo esta decidido: **columnas** en una tabla propia, o
+      **campos dentro del `jsonb` `riesgos`** con validacion
+- [ ] Si es tabla propia, existe **ADR** (cambia el modelo de datos) y la migracion esta
+      aplicada contra una base vacia
+- [ ] El riesgo tiene **estado**, con la lista de estados y las transiciones validas
+- [ ] El riesgo tiene **responsable**, y se sabe si es un correo o un usuario del sistema
+- [ ] El riesgo tiene **fecha objetivo**, y se sabe si es obligatoria
+- [ ] La **decision de aceptacion** tiene su tipo (aceptacion / excepcion) y su **fecha de
+      vencimiento**
+- [ ] El **historial** es append-only: se anota, no se edita ni se borra
+- [ ] El historial referencia el riesgo por su `clave` estable
+
+### 13.2 Reglas de negocio
+
+> Cada regla de aqui salio del prototipo de referencia. Copiadas sin entenderlas, fallan
+> en silencio.
+
+- [ ] **Una aceptacion vencida vuelve a requerir seguimiento.** "Aceptada" no es un estado
+      terminal: es una decision con fecha que hay que renovar
+- [ ] **Cerrar exige el comentario de validacion de cierre.** Sin el, "Cerrada" es un clic
+      sin consecuencias
+- [ ] **Aceptar exige tipo de decision *y* fecha de vencimiento.** Una aceptacion sin
+      fecha es eternal
+- [ ] **Un riesgo no puede quedar cerrado sin commentario**, y el backend lo rechaza
+- [ ] El **historial es de solo agregado**: no hay endpoint que edite una entrada
+- [ ] La transicion de estados se valida **en el caso de uso**, no solo en el formulario
+
+### 13.3 Contrato e integracion con lo ya construido
+
+- [ ] El **envoltorio del riesgo** del contrato se respeta: `clave`, `titulo`,
+      `descripcion`, `evidencia`, `confianza` siguen siendo los mismos
+- [ ] Los **campos de gestion** (estado, responsable, fecha, decision) se anaden **sin
+      romper** el contrato: van en `datos` o en campos propios, segun la decision del
+      punto 13.1
+- [ ] La `clave` permite **comparar riesgo por riesgo** entre dos analisis del mismo
+      documento (HU-10 7.6)
+- [ ] Un analisis ya guardado **no se invalida** por el cambio: si la forma se materializa
+      en columnas, hay migracion de los datos existentes
+- [ ] El backend valida el envoltorio **ademas** del contenido: clave unica, paginas de
+      evidencia dentro del documento y cubiertas por algun bloque, `confianza` de un valor
+      permitido
+
+### 13.4 Exportacion y respaldo
+
+> **Aplazado a la fase 2.** Exportar es una operacion de **salida de datos del sistema**,
+> y el resultado del analisis es el activo mas sensible del producto.
+
+- [ ] Existe **HU** para la exportacion: que se exporta, quien puede hacerlo, y si queda
+      registrado en la bitacora
+- [ ] La exportacion **no** incluye datos de otros usuarios ni de otras organizaciones
+- [ ] El CSV **escapa las formulas**: toda celda que empieza por `=`, `+`, `-`, `@`, tab o
+      CR lleva un apostrofo delante (la inyeccion de formulas en la hoja de calculo del
+      receptor)
+- [ ] La exportacion dice **que snapshot es**: el estado actual, no una fotografia
+      historica. El prototipo lo dice en la propia interfaz
+- [ ] El respaldo JSON se puede **restaurar** y la restauracion **valida** antes de
+      reemplazar los datos actuales
+
+### 13.5 Correo
+
+> **Aplazado a la fase 2.** La "fase de correos" del prototipo es el `mailto:` que se abre
+> al registrar un seguimiento.
+
+- [ ] Existe **HU** para el correo, con el alcance claro
+- [ ] El correo se envia por el **puerto de correo**, no por un `mailto:` del navegador
+- [ ] El cuerpo del correo **no** aparece en los logs
+- [ ] La implementacion de desarrollo escribe el correo en el log, para probar el flujo sin
+      contratar proveedor
+- [ ] El **dato** que dispara el correo (`responsable`) es un campo del riesgo, no una
+      direccion inventada por el sistema
+
+---
+
+## Gate 14 — Esqueleto del proyecto
+
+> Verifica que el proyecto **arranca y verifica** antes de que exista logica de negocio.
+> Un esqueleto que no compila es peor que no tener esqueleto: da la sensacion de avance.
+
+- [x] `uv sync` crea el entorno con **Python 3.14.10** — el pin de ADR-28, no 3.15
+- [x] `npm install` instala el frontend con **TypeScript 6.0.3** — el pin de ADR-28, no 7
+- [x] `uv run ruff check .` pasa sin errores
+- [x] `uv run mypy app` pasa sin errores
+- [x] `uv run lint-imports` dice **4 contratos, 0 rotos**
+- [x] `uv run pytest -m unit` corre **solo** las pruebas que no tocan base de datos ni red
+- [x] `npm run lint` pasa sin errores
+- [x] `npm run typecheck` pasa sin errores
+- [x] `npm run test` pasa
+- [x] `npm run build` construye
+- [x] **La app arranca sin configuracion** y falla con un mensaje que nombra las variables
+      que faltan
+- [x] **La app arranca con configuracion** y el emisor del JWT se deriva a
+      `{SUPABASE_URL}/auth/v1`
+- [x] El `.env.example` de cada lado esta versionado; el `.env` nunca
+- [x] La guia de arranque (`docs/ARRANQUE.md`) coincide con los comandos que existen
+- [x] El **arbol de carpetas documentado** coincide con el real, y las carpetas vacias se
+      versionan con `.gitkeep` (git no versiona carpetas vacias)
+
+---
+
+## Gate 15 — Documentacion
+
+> La documentacion es el entregable de este proyecto antes que el codigo. Un ADR que no
+> se actualiza es un ADR que no existe.
+
+- [x] Los cuatro marcadores de estado estan definidos igual en `CONTEXTO.md` y en
+      `AGENTS.md` — cuatro, no tres
+- [x] Cada ADR tiene fecha y motivo, y cambiar uno exige actualizar la tabla
+- [x] Cada PP abierta tiene **impacto** y **supuesto explicito**
+- [x] Las referencias de seccion (`seccion N.M`) resuelven contra los encabezados reales
+- [x] Los enlaces y anclas internas resuelven
+- [x] El verificador de documentacion no reporta hallazgos nuevos
+- [x] Los originales estan preservados en `docs/legacy/` y **no se editan**
+- [x] `docs/CONTRATO-RESULTADO-ANALISIS.md` existe y esta propagado a `ARQUITECTURA.md`,
+      `SKILL.md`, `HU-07` y `HU-10`
+- [x] Cada referencia a un repositorio clonado tiene su analisis en `docs/` y la carpeta
+      `referencias/` tiene sus reglas — hecho con `vulnerability-tracker`
+
+---
+
 ## Regla de la puerta
 
 > Si un item falla, el entregable no esta listo. Un frontend construido sobre una API a
 > medias absorbe cada hueco como si fuera su propio error, y el diagnostico se pierde.
+
+> Y al reves: **una casilla marcada sin evidencia no cuenta como cumplida.** Es una
+> promesa, no una verificacion.

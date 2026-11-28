@@ -20,7 +20,8 @@ Antes de escribir o modificar codigo:
 5. `docs/HU/` — la historia de usuario de la funcionalidad que se va a tocar. Ahi esta el
    camino feliz, los caminos de error y los **criterios de aceptacion** que se traducen en
    pruebas.
-6. `CHECKLIST.md` — los gates que hay que pasar.
+6. `CHECKLIST.md` — los gates que hay que pasar. Una casilla `[x]` **lleva la evidencia
+   al lado**: marcada sin evidencia no cuenta como cumplida.
 
 ### 1.2 Regla de la informacion faltante
 
@@ -236,7 +237,7 @@ verdad: las dos se actualizan en el mismo commit.
 | `docs/HU/` | Historias de usuario: camino feliz, caminos de error y criterios de aceptacion |
 | `docs/ARRANQUE.md` | Guia de arranque local: requisitos, comandos, orden de trabajo |
 | `SKILL.md` | Metodo y contratos de codigo (skill instalable) |
-| `CHECKLIST.md` | Gates de verificacion |
+| `CHECKLIST.md` | Gates de verificacion (19). Los `[x]` llevan la evidencia |
 | `CONTRIBUTING.md` | Convencion de commits y pull requests |
 | `backend/` | Codigo de la API (FastAPI). `app/`, `tests/`, `api/` |
 | `frontend/` | Codigo de la SPA (Vue 3.5). `src/`, `workers/` |
