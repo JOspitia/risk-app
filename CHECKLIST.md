@@ -140,6 +140,23 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
       `bloques.datos_estructurados` tiene `bloques_riesgos_gin` (GIN); los demas JSONB
       (`plantillas.esquema`, `analisis_documentos.riesgos`, `auditoria.detalles`) no se
       consultan por contenido en la v1
+- [x] El **advisor oficial de Supabase** (`supabase db advisors`) no reporta ningun
+      hallazgo de nivel ERROR ni WARN — verificado el 2026-11-28: de 56 hallazgos a 29,
+      y los 29 que quedan son de nivel INFO. Las correcciones fueron:
+      - `auth_rls_initplan` (37): las 24 apariciones de `auth.uid()` dentro de politicas
+        se enveloparon en `(select auth.uid())`, que es una constante para el
+        planificador. Las 9 restantes estan en las funciones de apoyo del esquema
+        `security`, que ya son `stable`
+      - `multiple_permissive_policies` (7): cada politica `for all` se partio en
+        `for insert`, `for update` y `for delete`. Dos politicas permisivas se
+        combinan con OR, y en `bloques` la condicion de escritura se contaminaba a
+        la lectura
+      - `unindexed_foreign_keys` (16): indice en cada FK. Una FK sin indice obliga a
+        un barrido secuencial de la tabla referenciada en cada cascada
+      - `unused_index` (14): se borraron los 2 que **duplicaban** a otro indice
+        (`bloques_documento_idx`, `analisis_documento_idx`). Los demas se quedan: el
+        advisor los ve sin uso porque la base esta vacia y el planificador no tiene
+        datos para decidir
 
 ---
 
@@ -398,7 +415,16 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 - [ ] Ningun endpoint del camino principal acepta un cuerpo mayor a 4.5 MB
 - [ ] La API responde en menos de 300 s con la carga esperada (limite por defecto de la
       funcion)
-- [ ] El `Dockerfile` construye y la imagen levanta el backend en local
+- [x] El `Dockerfile` construye y la imagen levanta el backend en local — verificado el
+      2026-11-28: `docker build` construye la imagen, `docker run` la levanta, el
+      `HEALTHCHECK` de Docker reporta `healthy` con codigo de salida 0, y `/health`
+      responde 200 desde fuera del contenedor. El proceso corre como el usuario
+      `riskapp` (uid 1001), no como `root`. La imagen mide 337 MB: `uv` quedo fuera de
+      la etapa final y el cache de descargas se limpia tras instalar. El `.venv` pesa
+      124 MB y casi todo es transitive del SDK de Supabase (`opentelemetry`,
+      `sentry_sdk`, `google`, `rich`, `pygments`, `uvloop`, `cryptography`): quitarlo
+      exigiria recortar el SDK, que es dependencia directa (ADR-05), asi que no se
+      toca
 - [ ] Las variables de entorno del entorno de produccion estan definidas en el proveedor,
       no en un archivo versionado
 - [x] Las **dependencias tienen pin exacto** y coinciden con lo instalado — ADR-27: un
@@ -543,6 +569,11 @@ cambio de proveedor es un cambio de codigo en los casos de uso.**
 - [x] `npm run test` pasa
 - [x] `npm run build` construye
 - [x] **La app arranca sin configuracion** y falla con un mensaje que nombra las variables
+- [x] La app expone un **router de salud** (`/health`, `/health/config`) — el
+      `HEALTHCHECK` del contenedor lo consulta, asi que tiene que existir antes que el
+      Dockerfile. Es la unica ruta sin token, asi que no expone ningun valor de
+      configuracion: devuelve si las variables estan presentes, nunca cuales son.
+      Verificado el 2026-11-28 con 6 pruebas
       que faltan
 - [x] **La app arranca con configuracion** y el emisor del JWT se deriva a
       `{SUPABASE_URL}/auth/v1`

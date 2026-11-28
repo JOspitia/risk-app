@@ -358,7 +358,7 @@ create policy miembros_lectura on organizaciones_miembros
   using (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or (
         organizacion_id = security.organizacion_activa()
         and security.usuario_tiene_permiso('usuarios.gestionar')
@@ -397,7 +397,7 @@ create policy perfiles_lectura on perfiles
   for select to authenticated
   using (
     (
-      id = auth.uid()
+      id = (select auth.uid())
       and security.es_usuario_activo()
     )
     or (
@@ -411,14 +411,14 @@ create policy perfiles_lectura on perfiles
 create policy perfiles_actualizacion on perfiles
   for update to authenticated
   using (
-    id = auth.uid()
+    id = (select auth.uid())
     or (
       security.es_usuario_activo()
       and security.usuario_tiene_permiso('usuarios.gestionar')
     )
   )
   with check (
-    id = auth.uid()
+    id = (select auth.uid())
     or (
       security.es_usuario_activo()
       and security.usuario_tiene_permiso('usuarios.gestionar')
@@ -445,7 +445,7 @@ create policy sesiones_lectura on sesiones_revocadas
   using (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or security.usuario_tiene_permiso('usuarios.gestionar')
     )
   );
@@ -456,7 +456,7 @@ create policy sesiones_alta on sesiones_revocadas
   with check (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or security.usuario_tiene_permiso('usuarios.gestionar')
     )
   );
@@ -506,7 +506,7 @@ create policy configuracion_lectura on configuracion_motor
     security.es_usuario_activo()
     and eliminado_en is null
     and (
-      (ambito = 'usuario' and usuario_id = auth.uid())
+      (ambito = 'usuario' and usuario_id = (select auth.uid()))
       or (ambito = 'organizacion' and organizacion_id = security.organizacion_activa())
     )
   );
@@ -519,7 +519,7 @@ create policy configuracion_escritura on configuracion_motor
     security.es_usuario_activo()
     and eliminado_en is null
     and (
-      (ambito = 'usuario' and usuario_id = auth.uid())
+      (ambito = 'usuario' and usuario_id = (select auth.uid()))
       or (ambito = 'organizacion' and organizacion_id = security.organizacion_activa())
     )
     and security.usuario_tiene_permiso('configuracion.editar')
@@ -527,7 +527,7 @@ create policy configuracion_escritura on configuracion_motor
   with check (
     security.es_usuario_activo()
     and (
-      (ambito = 'usuario' and usuario_id = auth.uid())
+      (ambito = 'usuario' and usuario_id = (select auth.uid()))
       or (ambito = 'organizacion' and organizacion_id = security.organizacion_activa())
     )
   );
@@ -544,7 +544,7 @@ create policy documentos_lectura on documentos
     security.es_usuario_activo()
     and eliminado_en is null
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or security.documento_compartido_conmigo(documentos.id)
       or (
         organizacion_id is not null
@@ -560,7 +560,7 @@ create policy documentos_alta on documentos
   for insert to authenticated
   with check (
     security.es_usuario_activo()
-    and usuario_id = auth.uid()
+    and usuario_id = (select auth.uid())
     and (
       organizacion_id is null
       or organizacion_id = security.organizacion_activa()
@@ -575,7 +575,7 @@ create policy documentos_actualizacion on documentos
   using (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or (
         organizacion_id = security.organizacion_activa()
         and security.usuario_tiene_permiso('analisis.ver_todos')
@@ -585,7 +585,7 @@ create policy documentos_actualizacion on documentos
   with check (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or (
         organizacion_id = security.organizacion_activa()
         and security.usuario_tiene_permiso('analisis.ver_todos')
@@ -600,14 +600,14 @@ create policy documentos_borrado on documentos
     security.es_usuario_activo()
     and eliminado_en is null
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or security.usuario_tiene_permiso('documentos.borrar')
     )
   )
   with check (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or security.usuario_tiene_permiso('documentos.borrar')
     )
   );
@@ -622,8 +622,8 @@ create policy documentos_compartidos_lectura on documentos_compartidos
   using (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
-      or compartido_por = auth.uid()
+      usuario_id = (select auth.uid())
+      or compartido_por = (select auth.uid())
       or (
         security.documento_de_mi_organizacion(documentos_compartidos.documento_id)
         and security.usuario_tiene_permiso('documentos.compartir')
@@ -647,8 +647,8 @@ create policy documentos_compartidos_borrado on documentos_compartidos
   using (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
-      or compartido_por = auth.uid()
+      usuario_id = (select auth.uid())
+      or compartido_por = (select auth.uid())
       or security.usuario_tiene_permiso('documentos.borrar')
     )
   );
@@ -720,7 +720,7 @@ create policy trabajos_lectura on trabajos
     security.es_usuario_activo()
     and eliminado_en is null
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or (
         documento_id is not null
         and security.documento_visible(documento_id)
@@ -732,11 +732,11 @@ create policy trabajos_escritura on trabajos
   for all to authenticated
   using (
     security.es_usuario_activo()
-    and usuario_id = auth.uid()
+    and usuario_id = (select auth.uid())
   )
   with check (
     security.es_usuario_activo()
-    and usuario_id = auth.uid()
+    and usuario_id = (select auth.uid())
   );
 
 -- La bitacora de actividades cuelga del trabajo: se ve si el trabajo se ve.
@@ -764,7 +764,7 @@ create policy auditoria_lectura on auditoria
   using (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or (
         organizacion_id = security.organizacion_activa()
         and security.usuario_tiene_permiso('auditoria.ver')
@@ -777,7 +777,7 @@ create policy auditoria_alta on auditoria
   with check (
     security.es_usuario_activo()
     and (
-      usuario_id = auth.uid()
+      usuario_id = (select auth.uid())
       or security.usuario_tiene_permiso('auditoria.ver')
       or security.usuario_tiene_permiso('usuarios.gestionar')
     )

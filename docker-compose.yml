@@ -1,0 +1,77 @@
+# =============================================================================
+# El backend en Docker
+#
+# Que levanta:
+# - **El backend**, para correrlo en un entorno reproducible, sin depender de que
+#   el desarrollador tenga Python 3.14.10 y las dependencias bien instaladas.
+#
+# Que NO levanta y por que:
+# - **La base de datos.** La levanta el CLI de Supabase (`supabase start`), que es
+#   la unica herramienta del proyecto para el stack local (ADR-32). Mantener dos
+#   stacks de Supabase (este y el del CLI) significaria dos juegos de datos y dos
+#   juegos de llaves, y el error mas probable seria trabajar contra el equivocado.
+#   El compose se conecta al stack del CLI por el puerto publicado.
+# - **El frontend.** Se sirve con `npm run dev`, que recarga en caliente. Dentro de
+#   un contenedor el ciclo de recarga es mas lento y el inspector del navegador no
+#   llega al contenedor. El frontend es estatico y no necesita la imagen.
+#
+# Uso:
+#
+#     supabase start            # primero: levanta la base local
+#     docker compose up -d      # luego: levanta el backend contra ella
+#     docker compose logs -f api
+#     docker compose down
+#
+# Las migraciones **no** se aplican desde aqui. Se aplican con el CLI:
+#
+#     supabase db reset             # recrea el esquema desde cero
+#     supabase db push --local      # aplica solo las migraciones nuevas
+#
+# -----------------------------------------------------------------------------
+# LAS LLAVES
+#
+# Este archivo **no lleva llaves de verdad**. Las variables usan la forma
+# `${VARIABLE:-valor_por_defecto}`, y los valores por defecto son los del stack
+# local de desarrollo, que son publicos: los imprime `supabase start`.
+#
+# El motivo es concreto: la push protection de GitHub bloquea cualquier push que
+# contenga una llave de Supabase, y hace bien. Un `service_role` versionado es una
+# credencial que salta el RLS en manos de cualquiera que clone el repositorio.
+#
+# Para apuntar a otro juego de llaves (por ejemplo, el del proyecto en la nube), se
+# define un `.env` en la raiz, que esta en `.gitignore`:
+#
+#     SUPABASE_URL=...
+#     SUPABASE_ANON_KEY=...
+#     SUPABASE_SERVICE_ROLE_KEY=...
+#
+# Docker Compose lee ese `.env` automaticamente.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # El backend.
+  #
+  # `SUPABASE_URL` apunta al stack del CLI, que en el host es el puerto 54321.
+  # Dentro de la red de Docker el nombre `host.docker.internal` es el host: por
+  # eso la URL por defecto no es `localhost`, que dentro del contenedor seria el
+  # propio contenedor.
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: risk-app-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    extra_hosts:
+      # En Docker Desktop de Windows y macOS, `host.docker.internal` no siempre
+      # viene definido. Esta linea lo garantiza en Linux tambien.
+      - "host.docker.internal:host-gateway"
