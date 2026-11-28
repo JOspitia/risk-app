@@ -1,0 +1,36 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+*.local
+
+# Secretos: el `.env` nunca se versiona
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Tipos generados de la API: se versionan a proposito (ARQUITECTURA.md 1.2),
+# pero su archivo local de cache no.
+.tsbuildinfo
