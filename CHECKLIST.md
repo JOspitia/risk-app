@@ -434,6 +434,52 @@ cambio de proveedor es un cambio de codigo en los casos de uso.**
 
 ---
 
+## Gate 14 — Esqueleto del proyecto
+
+> Verifica que el proyecto **arranca y verifica** antes de que exista logica de negocio.
+> Un esqueleto que no compila es peor que no tener esqueleto: da la sensacion de avance.
+
+- [x] `uv sync` crea el entorno con **Python 3.14.10** — el pin de ADR-28, no 3.15
+- [x] `npm install` instala el frontend con **TypeScript 6.0.3** — el pin de ADR-28, no 7
+- [x] `uv run ruff check .` pasa sin errores
+- [x] `uv run mypy app` pasa sin errores
+- [x] `uv run lint-imports` dice **4 contratos, 0 rotos**
+- [x] `uv run pytest -m unit` corre **solo** las pruebas que no tocan base de datos ni red
+- [x] `npm run lint` pasa sin errores
+- [x] `npm run typecheck` pasa sin errores
+- [x] `npm run test` pasa
+- [x] `npm run build` construye
+- [x] **La app arranca sin configuracion** y falla con un mensaje que nombra las variables
+      que faltan
+- [x] **La app arranca con configuracion** y el emisor del JWT se deriva a
+      `{SUPABASE_URL}/auth/v1`
+- [x] El `.env.example` de cada lado esta versionado; el `.env` nunca
+- [x] La guia de arranque (`docs/ARRANQUE.md`) coincide con los comandos que existen
+- [x] El **arbol de carpetas documentado** coincide con el real, y las carpetas vacias se
+      versionan con `.gitkeep` (git no versiona carpetas vacias)
+
+---
+
+## Gate 15 — Documentacion
+
+> La documentacion es el entregable de este proyecto antes que el codigo. Un ADR que no
+> se actualiza es un ADR que no existe.
+
+- [x] Los cuatro marcadores de estado estan definidos igual en `CONTEXTO.md` y en
+      `AGENTS.md` — cuatro, no tres
+- [x] Cada ADR tiene fecha y motivo, y cambiar uno exige actualizar la tabla
+- [x] Cada PP abierta tiene **impacto** y **supuesto explicito**
+- [x] Las referencias de seccion (`seccion N.M`) resuelven contra los encabezados reales
+- [x] Los enlaces y anclas internas resuelven
+- [x] El verificador de documentacion no reporta hallazgos nuevos
+- [x] Los originales estan preservados en `docs/legacy/` y **no se editan**
+- [x] `docs/CONTRATO-RESULTADO-ANALISIS.md` existe y esta propagado a `ARQUITECTURA.md`,
+      `SKILL.md`, `HU-07` y `HU-10`
+- [x] Cada referencia a un repositorio clonado tiene su analisis en `docs/` y la carpeta
+      `referencias/` tiene sus reglas — hecho con `vulnerability-tracker`
+
+---
+
 ## Regla de la puerta
 
 > Si un item falla, el entregable no esta listo. Un frontend construido sobre una API a
