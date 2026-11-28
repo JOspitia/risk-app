@@ -95,9 +95,9 @@ conservan; lo que cambia es el vocabulario y donde viven las interfaces.
 | Request | DTO de entrada | Esquema de entrada del adaptador | `adapters/http/schemas/` |
 | Controller | Router | **Adaptador de entrada** | `adapters/http/routers/` |
 | Service | Logica de negocio | **Caso de uso** | `application/use_cases/` |
-| Service interface | Contrato de servicio | **Puerto** del caso de uso | `application/ports/` |
+| Service interface | Contrato de servicio | **Puerto** del caso de uso | `domain/ports/` |
 | Repository interface | Contrato de datos | **Puerto de salida** | `domain/ports/` |
-| Repository impl | SQL | **Adaptador de salida** | `adapters/db/` |
+| Repository impl | SQL | **Adaptador de salida** | `adapters/supabase/` |
 | Model | Entidad | **Entidad de dominio** | `domain/entities/` |
 | Resource | DTO de salida | **Mapper de salida** | `adapters/http/schemas/` |
 | Response | Envelope | **Envelope de API** | `adapters/http/responses.py` |
@@ -679,7 +679,7 @@ los mapeadores de fila tienen que cambiar. Un desajuste aparece como un fallo en
 lejos de la edicion que lo causo.
 
 ```python
-# adapters/db/columnas.py
+# adapters/supabase/columnas.py
 COLUMNAS_DOCUMENTO = (
     "id, usuario_id, organizacion_id, nombre_archivo, hash_sha256, "
     "total_paginas, modo_procesamiento, estado, error_mensaje, "
@@ -1347,7 +1347,13 @@ class Almacenamiento(Protocol):
 
     async def guardar(self, bucket: str, ruta: str, archivo: Archivo) -> str: ...
 
-    async def url_firmada(self, bucket: str, ruta: str, duracion_s: int) -> str: ...
+    # `como_descarga=True` pide la URL como adjunto (Content-Disposition: attachment),
+    # no para ver en linea. Un PDF con JavaScript embebido servido en linea se ejecuta
+    # en el origen del navegador: por eso la descarga de un documento es siempre
+    # una descarga, nunca una vista.
+    async def url_firmada(
+        self, bucket: str, ruta: str, duracion_s: int, *, como_descarga: bool = True
+    ) -> str: ...
 
     async def eliminar(self, bucket: str, ruta: str) -> None: ...
 ```
@@ -1355,7 +1361,9 @@ class Almacenamiento(Protocol):
 Implementaciones:
 
 - **Supabase Storage** (v1): bucket privado, RLS sobre `storage.objects`, clave del objeto
-  `{organizacion_id}/{usuario_id}/{documento_id}.pdf`.
+  `{organizacion_id}/{usuario_id}/{documento_id}.pdf`. La URL firmada de descarga se pide
+  **con la opcion de descarga** (`download=True`): sin ella, Supabase sirve el objeto en
+  linea.
 - **S3** o **SFTP** (futuro, si el cliente tiene los suyos): otro adaptador. Los casos de uso
   no cambian.
 
@@ -1534,6 +1542,12 @@ def calcular_paginas_por_bloque(
 
     El resultado es una estimacion de partida. El limite real se comprueba por bloque
     con tokens estimados (seccion 10.2.2).
+
+    **Esta funcion no recibe `overlap_paginas`, y no es un olvido.** El solapamiento
+    no cambia cuantas paginas caben en la ventana: cambia **cuanto se avanza** entre
+    bloque y bloque. El tamano sale de los tokens (`utiles // tokens_por_pagina`), el
+    avance sale del solapamiento (`tamano - overlap`) y el numero de bloques sale de
+    ambos (`contar_bloques`). Son tres preguntas distintas, y por eso son tres funciones.
     """
     utiles = ventana_contexto - tokens_reservados
     if utiles <= 0:
@@ -2343,7 +2357,7 @@ sobre una API a medias absorbe cada hueco como si fuera su propio error.
 3. **Entidad de dominio.** Inmutable, sin concerns de serializacion, en `domain/entities/`.
 4. **Puertos.** En `domain/ports/`, solo los metodos que el caso de uso usa.
 5. **Gate de decision.** Crea solo lo que las respuestas exigen.
-6. **Implementacion del puerto.** En `adapters/db/`, con la constante de columnas
+6. **Implementacion del puerto.** En `adapters/supabase/`, con la constante de columnas
    compartida.
 7. **Caso de uso.** En `application/use_cases/`. La transaccion vive aqui.
 8. **Adaptador de entrada.** En `adapters/http/routers/`. Solo orquestacion.

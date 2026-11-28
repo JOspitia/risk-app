@@ -82,14 +82,28 @@ La configuracion guarda el **modelo**, y el resto de parametros por defecto se d
 El catalogo de modelos vive en el frontend (son los de WebLLM), pero **el backend valida**
 que el modelo enviado exista.
 
+**El catalogo canonico esta en `CONTEXTO.md` seccion 5.4.** La tabla siguiente es la
+misma, con la recomendacion de esta historia. No son dos listas: si un modelo aparece en
+una, aparece en las dos.
+
 | Modelo | VRAM estimada | Ventana | Notas |
 |---|---|---|---|
 | `gemma3-1b-it-q4f16_1-MLC` | 711 MB | 4K | La mas ligera |
 | `Llama-3.2-1B-Instruct-q4f16_1-MLC` | 879 MB | 4K | Equipos con poca VRAM |
+| `Qwen3-0.6B-q4f16_1-MLC` | 1.4 GB | 4K | Modo thinking: genera tokens extra |
+| `Qwen3.5-0.8B-q4f16_1-MLC` | 1.6 GB | 4K | |
+| `gemma-2-2b-it-q4f16_1-MLC` | 1.9 GB | 4K | |
 | `Qwen3-1.7B-q4f16_1-MLC` | 2.0 GB | 4K | Modo thinking: no recomendado para extraccion |
 | `Llama-3.2-3B-Instruct-q4f16_1-MLC` | 2.2 GB | 4K | Buen equilibrio |
-| `Phi-4-mini-instruct-q4f16_1-MLC` | 3.4 GB | 4K | Fuerte en extraccion estructurada |
 | `gemma-4-E2B-it-q4f16_1-MLC` | 3.3 GB | 4K | Requiere `shader-f16` |
+| `Qwen3-4B-q4f16_1-MLC` | 3.4 GB | 4K | Modo thinking: penaliza latencia |
+| `Phi-4-mini-instruct-q4f16_1-MLC` | 3.4 GB | 4K | Fuerte en extraccion estructurada |
+
+**Los que se recomiendan para extraccion estructurada** son `Phi-4-mini-instruct` y
+`Llama-3.2-3B-Instruct`. Los de la familia Qwen traen modo *thinking*: generan tokens de
+razonamiento que consumen ventana y ralentizan la extraccion sin aportar nada a un esquema
+fijo. `gemma-4-E2B` es el unico que pide `shader-f16`: antes de sugerarlo hay que
+comprobar que el equipo lo soporta (HU-05).
 
 ### Parametros editables
 
