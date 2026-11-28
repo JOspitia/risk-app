@@ -53,6 +53,16 @@ class Config(BaseSettings):
         default=None,
         description="Claves publicas para validar tokens asimetricos (RS256/ES256).",
     )
+    supabase_jwt_issuer: str | None = Field(
+        default=None,
+        description=(
+            "Emisor que se espera en el token. Si no se define, se deriva de "
+            "`SUPABASE_URL`. Solo hace falta separarlo cuando la URL de conexion "
+            "y la URL publica del proyecto son distintas: es lo que pasa en local "
+            "con el backend en Docker, donde se conecta por `host.docker.internal` "
+            "pero el navegador emite los tokens con `127.0.0.1`."
+        ),
+    )
 
     # --- Otros ----------------------------------------------------------
 
@@ -95,7 +105,17 @@ class Config(BaseSettings):
 
     @property
     def jwt_issuer(self) -> str:
-        """Emisor del JWT. Supabase emite los tokens en `{SUPABASE_URL}/auth/v1`."""
+        """Emisor del JWT.
+
+        Supabase emite los tokens en `{URL_PUBLICA}/auth/v1`. La URL **publica**
+        del proyecto no siempre es la misma que la de **conexion**: dentro de un
+        contenedor, el backend se conecta por `host.docker.internal`, pero el
+        token lo emite el navegador contra la URL publica. Por eso el emisor se
+        puede fijar aparte, y si no se fija se deriva de `SUPABASE_URL`, que es
+        lo correcto cuando ambas coinciden (la nube).
+        """
+        if self.supabase_jwt_issuer:
+            return self.supabase_jwt_issuer.rstrip("/")
         return f"{self.supabase_url.rstrip('/')}/auth/v1"
 
     @property

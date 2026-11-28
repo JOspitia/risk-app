@@ -42,6 +42,46 @@ class TestVariablesObligatorias:
             )
 
 
+class TestEmisorDelToken:
+    """El emisor esperado es la URL **publica** del proyecto.
+
+    No siempre es la misma que la de conexion: dentro de un contenedor, el
+    backend se conecta por `host.docker.internal`, pero el token lo emite el
+    navegador contra la URL publica. Si se confundieran, todo token valido
+    se rechazaria por emisor.
+    """
+
+    def test_se_deriva_de_la_url_cuando_no_se_fija(self) -> None:
+        config = Config(
+            supabase_url="https://ejemplo.supabase.co",
+            supabase_anon_key="pub",
+            supabase_service_role_key="srv",
+        )
+        assert config.jwt_issuer == "https://ejemplo.supabase.co/auth/v1"
+
+    def test_se_puede_fijar_aparte(self) -> None:
+        """El caso de local con el backend en Docker."""
+        config = Config(
+            supabase_url="http://host.docker.internal:54321",
+            supabase_anon_key="pub",
+            supabase_service_role_key="srv",
+            supabase_jwt_issuer="http://127.0.0.1:54321/auth/v1",
+        )
+        assert config.jwt_issuer == "http://127.0.0.1:54321/auth/v1"
+
+    def test_el_jwks_sigue_derivandose_de_la_url_de_conexion(self) -> None:
+        """Las claves publicas se piden donde el proyecto responde, no donde lo emite."""
+        config = Config(
+            supabase_url="http://host.docker.internal:54321",
+            supabase_anon_key="pub",
+            supabase_service_role_key="srv",
+            supabase_jwt_issuer="http://127.0.0.1:54321/auth/v1",
+        )
+        assert config.jwks_url == (
+            "http://host.docker.internal:54321/auth/v1/.well-known/jwks.json"
+        )
+
+
 class TestOrigenesCors:
     """CORS con credenciales y `*` es una combinacion que no se permite."""
 
