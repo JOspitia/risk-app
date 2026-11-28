@@ -374,8 +374,9 @@ que son documentos de trabajo y no la fuente de verdad.
 | PP-10 | **Quien puede pedir un reanálisis**: cualquiera con `documentos.analizar` o solo un admin | HU-10 variable `permitir_reanalisis` | Medio. Es una politica del cliente. El interruptor por organizacion ya esta previsto |
 | PP-11 | El **nombre definitivo del campo** que enlaza un analisis del historial con el que lo sustituyo | HU-10 seccion de modelo de datos | Bajo. Es una decision de la migracion. Se documenta `reemplazado_por` como nombre provisional |
 | PP-12 | La **duracion de la URL firmada** de descarga | HU-09 variable `duracion_url_firmada` | Bajo. Se asume 1 hora. Confirmar con el cliente |
-| PP-13 | Los **campos de riesgo concretos** que se extraen | HU-07 seccion 4, HU-10 comparacion de hallazgos | **Alto.** Depende del cliente. Sin esto la plantilla de extraccion sigue siendo generica y la demo no muestra el valor real |
+| PP-13 | Los **campos de riesgo concretos** que se extraen | HU-07 seccion 4, HU-10 comparacion de hallazgos, `docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md` §4 | **Alto.** Depende del cliente. Sin esto la plantilla de extraccion sigue siendo generica y la demo no muestra el valor real. **El analisis del prototipo aporta la forma, no la respuesta** |
 | PP-14 | **Como se comparte el algoritmo de troceado** entre Python y TypeScript | ARQUITECTURA.md 1.2, `shared/chunking-casos.json` | Medio. La estructura de carpetas ya esta decidida; falta el mecanismo |
+| PP-15 | Si el **resultado del analisis tiene ciclo de vida** (estado, responsable, fecha, decision) o es solo una consulta | Analisis de referencia §6.2 | **Alto.** Depende del cliente. Si es si, cambia el modelo de datos y exige ADR |
 
 ### PP-14 — Como se comparte el troceado entre los dos lados
 
@@ -425,6 +426,67 @@ lo pida.
 
 **PP-13 es el mas urgente de los nuevos:** sin los campos de riesgo concretos, la
 extraccion es una demo generica. Es informacion que solo tiene el cliente.
+
+### PP-13 — Que aporta el prototipo de referencia, y que no
+
+El analisis del prototipo `vulnerability-tracker` (ver
+`docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md`) **si dice que campos existen y
+como se llaman**. Su formulario de hallazgo tiene siete:
+
+```
+severity    Critica | Alta | Media | Baja
+cvss        0 a 10 (decimal)
+status      Abierta | En remediacion | Pendiente de retest |
+            Pendiente de validacion | Aceptada | Cerrada
+owner       correo del responsable
+due         fecha objetivo / vencimiento de aceptacion
+decision    (vacio) | Aceptacion de riesgo | Excepcion
+notes       comentarios y validacion de cierre
+```
+
+**Lo que esto NO cierra.** El prototipo extrae de un **pentest**: un informe donde un
+humano ya identifico los hallazgos. Un PDF arbitrario no viene con "`F-001`, severidad
+Alta, CVSS 8.2". El LLM tendria que **inventar** esos valores, y un valor inventado es
+peor que un campo vacio: parece dato y no lo es.
+
+Por eso la pregunta que queda para el cliente no es "que campos", sino **dos**:
+1. **Cuales se extraen del documento** (los que el LLM puede inferir razonablemente).
+2. **Cuales define una persona despues** (el responsable, la fecha objetivo y la
+   decision de aceptacion: ninguno de los tres esta en el PDF).
+
+**La severidad tiene una condicion.** Si se extrae, la plantilla debe llevar la
+**rubrica** que la define: un LLM que dice "Alta" sin definir que es "Alta" produce
+numeros inventados con apariencia de clasificacion. Y la rubrica tiene que venir del
+cliente, porque la severidad de un riesgo es una politica, no un hecho del documento.
+
+### PP-15 — Si el resultado del analisis se gestiona despues
+
+**Que se decide.** Hoy `analisis_documentos` guarda un resultado que se consulta. El
+prototipo de referencia tiene algo mas: el hallazgo **se gestiona**. Tiene estado
+(Abierta, En remediacion, Pendiente de retest, Pendiente de validacion, Aceptada,
+Cerrada), responsable, fecha objetivo, decision de aceptacion con vencimiento, y un
+historial de seguimiento que solo crece.
+
+**Por que importa.** El prototipo escribe una regla que no es obvia: **una aceptacion
+de riesgo vencida vuelve a requerir seguimiento**. Es decir, "Aceptada" no es un estado
+terminal, sino una decision con fecha que hay que renovar.
+
+**Lo que NO se decide aqui.** Si Risk-app es un sistema de *consulta de analisis* o un
+sistema de *gestion de riesgos*. Son productos distintos:
+
+- Si es solo consulta, el prototipo aporta poco mas que la forma de los campos, y
+  PP-15 se cierra con "no".
+- Si es gestion, cambian el modelo de datos (`analisis_documentos` gana estado,
+  responsable, fecha y decision), los casos de uso, los permisos y la interfaz. Eso
+  **exige ADR** y al menos una HU nueva.
+
+**Lo que hay que preguntarle al cliente.** Si el resultado de un analisis va a seguir
+vivo despues de la entrega — quien responde, con que fecha, y si se acepta o se cierra
+— o si el documento es un informe de una vez y lo que importa es el resultado.
+
+**Supuesto mientras no se cierre:** **consulta**. El alcance de la v1 es el pipeline y
+su resultado, y ampliarlo sin que el cliente lo pida seria construir un producto
+distinto por cuenta propia.
 
 ---
 

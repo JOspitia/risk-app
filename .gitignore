@@ -30,6 +30,16 @@ supabase/.temp/
 *.tmp.md
 *.mdtmp
 
+# Informes de validacion: son de trabajo, no del proyecto.
+# Se conservan en `docs/legacy/` cuando forman parte del historial.
+validacion-*.md
+
+# Referencias: codigo de terceros clonado solo para leer.
+# Se versiona el contenido (es el objeto del analisis) pero no su historial.
+referencias/**/.git/
+referencias/**/node_modules/
+referencias/**/data/
+
 # Entorno: nunca se versiona un secreto
 .env
 .env.*

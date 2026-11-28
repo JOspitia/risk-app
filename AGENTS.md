@@ -241,4 +241,5 @@ verdad: las dos se actualizan en el mismo commit.
 | `frontend/` | Codigo de la SPA (Vue 3.5). `src/`, `workers/` |
 | `supabase/` | `config.toml` y `migrations/*.sql`: el esquema del proyecto |
 | `shared/` | Fixtures compartidas entre Python y TypeScript (casos dorados del chunking) |
+| `referencias/` | Codigo de terceros clonado **solo para leer**. El analisis esta en `docs/` |
 | `docs/legacy/` | Documentos originales sin procesar. No se editan |
