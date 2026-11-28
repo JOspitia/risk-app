@@ -123,7 +123,7 @@ def _buscar_usuario_por_correo(
         usuarios = cuerpo.get("users") or []
         for usuario in usuarios:
             if (usuario.get("email") or "").lower() == correo.lower():
-                return usuario["id"]
+                return str(usuario["id"])
 
         if len(usuarios) < PAGINA_USUARIOS:
             # Ultima pagina: no hay mas usuarios.
@@ -198,13 +198,20 @@ def _upsert_perfil(
     nombres: str,
     apellido_1: str,
     apellido_2: str | None,
+    rol: str = "admin",
+    activo: bool = True,
+    debe_cambiar_contrasena: bool = True,
 ) -> None:
-    """Registra el perfil del administrador.
+    """Registra el perfil del usuario.
 
     Va por la API de `service_role`, que es la que puede escribir en `perfiles` sin
     que las politicas lo bloqueen. El `insert` no puede simplemente reintentarse: la
     politica de `perfiles` no tiene `upsert` y el `id` es la clave primaria, asi que
     se borra y se inserta dentro de una peticion.
+
+    `rol` y `activo` tienen valor por defecto para que el bootstrap del primer
+    administrador no cambie de comportamiento; el seeder de usuarios de prueba los
+    fija.
     """
     url = f"{url_base}/rest/v1/perfiles"
     cabeceras = {
@@ -217,14 +224,14 @@ def _upsert_perfil(
     cuerpo = {
         "id": usuario_id,
         "organizacion_id": None,
-        "rol": "admin",
+        "rol": rol,
         "nombres": nombres,
         "apellido_1": apellido_1,
         "apellido_2": apellido_2,
         "display_name": f"{nombres} {apellido_1}".strip(),
         "correo": correo,
-        "debe_cambiar_contrasena": True,
-        "activo": True,
+        "debe_cambiar_contrasena": debe_cambiar_contrasena,
+        "activo": activo,
     }
 
     respuesta = cliente.post(url, headers=cabeceras, json=cuerpo)
@@ -272,7 +279,7 @@ def _upsert_organizacion(
 
     existentes = respuesta.json()
     if existentes:
-        return existentes[0]["id"]
+        return str(existentes[0]["id"])
 
     respuesta = cliente.post(
         url,
@@ -284,7 +291,7 @@ def _upsert_organizacion(
             f"No se pudo crear la organizacion: {respuesta.status_code} {respuesta.text}"
         )
 
-    return respuesta.json()[0]["id"]
+    return str(respuesta.json()[0]["id"])
 
 
 def _upsert_membresia(
@@ -293,12 +300,16 @@ def _upsert_membresia(
     llave_servicio: str,
     organizacion_id: str,
     usuario_id: str,
+    rol: str = "admin",
 ) -> None:
-    """Registra al administrador como miembro de la organizacion, con rol `admin`.
+    """Registra al usuario como miembro de la organizacion, con el rol indicado.
 
     Sin esta fila, el aislamiento no tiene ninguna membresia que resolver y el
-    administrador no ve nada: `organizaciones_miembros` es la fuente del aislamiento
+    usuario no ve nada: `organizaciones_miembros` es la fuente del aislamiento
     (ADR-33).
+
+    El rol tiene valor por defecto para que el bootstrap del primer administrador no
+    cambie de comportamiento; el seeder de usuarios de prueba lo fija.
     """
     url = f"{url_base}/rest/v1/organizaciones_miembros"
     cabeceras = {
@@ -314,7 +325,7 @@ def _upsert_membresia(
         json={
             "organizacion_id": organizacion_id,
             "usuario_id": usuario_id,
-            "rol": "admin",
+            "rol": rol,
         },
     )
     if respuesta.status_code not in (200, 201, 204):
