@@ -3,7 +3,7 @@
 ## Encabezado
 
 - **HU ID:** `HU-10`
-- **Fecha:** 2026-11-27
+- **Fecha:** 2026-11-28
 - **Estado:** Pendiente de implementacion
 - **Cubre:** RF-24 (volver a analizar un documento archivado cuando cambie la plantilla, sin volver a pedir el archivo)
 - **ADR relacionados:** ADR-20 (los documentos se archivan en Supabase Storage, en un bucket privado, subidos directo desde el navegador), ADR-25 (el resultado es un JSON de resumenes por bloque + resumen ejecutivo, entregado por DTO), ADR-26 (el reanálisis tiene su propio endpoint y el archivo viaja del bucket al navegador), ADR-14 (seguimiento en la tabla `trabajos`)
@@ -230,6 +230,32 @@ trabajos
 3. Es **informativo**. El resultado nuevo queda guardado de todos modos, y el anterior
    tambien.
 
+### 7.6 Comparar riesgo por riesgo
+
+El conteo de 7.5 dice **cuanto** cambio, no **que**. Como cada riesgo lleva una `clave`
+estable dentro del analisis (ver
+[`CONTRATO-RESULTADO-ANALISIS.md`](../CONTRATO-RESULTADO-ANALISIS.md)), la comparacion
+puede ser **por riesgo**:
+
+1. Se emparejan los riesgos del analisis nuevo con los del anterior por `clave`.
+2. Se clasifican en tres grupos:
+   - **Persisten**: la `clave` esta en los dos analisis.
+   - **Nuevos**: la `clave` solo esta en el nuevo.
+   - **Desaparecidos**: la `clave` solo esta en el anterior.
+3. La respuesta informa de los tres grupos y, para los que persisten, si cambio el
+   contenido de `datos` (por ejemplo, la severidad).
+
+> **El emparejamiento por `clave` es exacto dentro de un documento** y **no** entre
+> documentos distintos: la clave es opaca y se genera en el pipeline, asi que no
+> significa nada fuera del analisis que la produjo. Para comparar dos documentos
+> diferentes haria falta un identificador de negocio, que es una decision de la fase de
+> gestion (PP-13, PP-15).
+
+4. Si el analisis nuevo y el anterior se hicieron con **plantillas distintas**, la
+   comparacion por clave se informa **con esa advertencia**: los riesgos se extrajeron
+   con criterios distintos, asi que "desaparecido" puede significar "no lo pide la
+   plantilla nueva" y no "ya no esta".
+
 ---
 
 ## 8. Caminos tristes
@@ -324,6 +350,22 @@ trabajos
 **Cuando** el reanálisis detecta 3
 **Entonces** la respuesta dice que se detectaron menos campos que en el analisis anterior
 **Y** el resultado nuevo queda guardado de todos modos
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-12: La comparacion es por riesgo, no solo un conteo
+**Dado** un documento reanalizado con riesgos `r-a`, `r-b` y `r-c`
+**Y** el analisis anterior tenia `r-a`, `r-b` y `r-d`
+**Cuando** se pide la comparacion
+**Entonces** la respuesta dice que `r-a` y `r-b` **persisten**, que `r-c` es **nuevo** y
+que `r-d` **desaparecio**
+**Y** si las plantillas son distintas, la respuesta lo advierte
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-13: La clave no se usa entre documentos distintos
+**Dado** dos documentos analizados con el mismo modelo y la misma plantilla
+**Cuando** se comparan sus riesgos
+**Entonces** **no** se emparejan por `clave`, porque la clave es opaca y solo tiene
+sentido dentro del analisis que la produjo
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-08: Un documento no archivado no se reanálisis

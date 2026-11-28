@@ -3,7 +3,7 @@
 ## Encabezado
 
 - **HU ID:** `HU-07`
-- **Fecha:** 2026-11-27
+- **Fecha:** 2026-11-28
 - **Estado:** Pendiente de implementacion
 - **Cubre:** RF-04 (extraer y limpiar el texto), RF-05 (dividir en bloques con tamano derivado), RF-06 (analizar cada bloque y extraer campos validos), RF-07 (consolidar en un resumen ejecutivo), RF-08 (persistir documento, bloques y analisis, con insercion por lotes)
 - **ADR relacionados:** ADR-08 (tamano derivado), ADR-09 (reduce jerarquico), ADR-11 (solo documentos digitales, sin OCR), ADR-06 (motor en el navegador), ADR-15 (artefacto JSON)
@@ -105,6 +105,40 @@ La plantilla define el esquema. Ejemplo **ilustrativo** de la forma, no del cont
 `[PENDIENTE]` Los campos concretos de riesgo **no estan definidos**: dependen de la empresa.
 La plantilla tiene hoy una instruccion generica.
 
+**Pero el envoltorio del riesgo si esta definido.** Cada riesgo que el bloque produce
+lleva una forma fija, con un envoltorio nuestro y un contenido de la plantilla:
+
+```json
+{
+  "clave": "r-3f9a2c",
+  "titulo": "Manejo de credenciales sin cifrar",
+  "descripcion": "Las credenciales aparecen en texto plano en la seccion 4.2.",
+  "datos": { "...": "los campos que defina la plantilla" },
+  "evidencia": { "paginas": [12], "cita": "..." },
+  "confianza": "alta"
+}
+```
+
+| Parte | De quien es | Que lleva |
+|---|---|---|
+| Envoltorio | **Nuestro** | `clave`, `titulo`, `descripcion`, `evidencia`, `confianza` |
+| Contenido | **De la plantilla** | `datos`: los campos de riesgo que defina el cliente |
+
+El contrato completo esta en
+[`CONTRATO-RESULTADO-ANALISIS.md`](../CONTRATO-RESULTADO-ANALISIS.md).
+
+**Por que el envoltorio no depende de PP-13.** `datos` es donde viven los campos de
+riesgo, asi que el contenido cambia con la plantilla y el envoltorio no. PP-13 decide
+que va dentro de `datos`; el envoltorio ya esta.
+
+**Por que `evidencia` es obligatoria.** Un riesgo sin pagina **no es verificable**: el
+usuario no puede comprobarlo sin releer el documento entero, que es justo lo que todavia
+no ha leido. La `paginas` es una lista porque un riesgo puede aparecer en dos bloques
+(por el solapamiento de 1 pagina) y las dos apariciones deben mapear al mismo `clave`.
+
+**Por que `confianza`.** El LLM no tiene certeza y el usuario no puede saber cuanto.
+Sin el campo, un hallazgo solido y uno dudoso pesan igual.
+
 ---
 
 ## 5. Suposiciones
@@ -203,6 +237,15 @@ bloques y el backend recibe 34, ambos coinciden.
 3. Si no caben: se agrupan en lotes que quepan, se reduce cada lote y se reducen los
    resultados intermedios (hasta dos niveles para documentos de hasta ~200 paginas).
 4. Se obtiene el resumen ejecutivo final.
+5. **Se consolidan los riesgos.** Un riesgo que aparece en varios bloques (por el
+   solapamiento) **conserva la `clave` del primer bloque donde aparece** y **fusiona** sus
+   paginas de `evidencia` en una sola lista. Un riesgo que solo aparece en un bloque
+   conserva la suya.
+6. Las `clave` resultantes son **unicas** dentro del analisis.
+
+> El paso 5 es lo que hace que la `clave` sea estable. Sin el, un riesgo que cae en el
+> limite entre dos bloques apareceria duplicado con dos claves, y el backend lo
+> rechazaria con 422.
 
 ### 7.5 Enviar y persistir
 
@@ -212,10 +255,17 @@ bloques y el backend recibe 34, ambos coinciden.
    - si un resumen no cumple, se rechaza el conjunto entero (respuesta 422),
    - si el numero de bloques no coincide con el esperado, se rechaza,
    - si los rangos de pagina no son coherentes, se rechaza.
-3. El backend persiste documento, bloques y analisis en **una sola transaccion** (una funcion
+3. El backend valida ademas el **envoltorio** del riesgo (ver
+   [`CONTRATO-RESULTADO-ANALISIS.md`](../CONTRATO-RESULTADO-ANALISIS.md) seccion 5):
+   - cada riesgo tiene `clave`, `titulo`, `descripcion`, `datos`, `evidencia` y
+     `confianza`,
+   - las `clave` son unicas dentro del analisis,
+   - `evidencia.paginas` son paginas que existen y estan cubiertas por algun bloque,
+   - `confianza` es `alta`, `media` o `baja`.
+4. El backend persiste documento, bloques y analisis en **una sola transaccion** (una funcion
    de Postgres por RPC).
-4. El backend marca el trabajo como completado.
-5. Responde 201 con el `documento_id` y el resumen ejecutivo.
+5. El backend marca el trabajo como completado.
+6. Responde 201 con el `documento_id` y el resumen ejecutivo.
 
 > El resultado **no** viaja en `POST /api/v1/documentos`. Ese endpoint registra el
 > documento y devuelve la URL de subida; el resultado llega despues, en su propio
@@ -237,6 +287,9 @@ bloques y el backend recibe 34, ambos coinciden.
 | SP-08 | La **plantilla no existe** o no esta activa | 422. El cliente no puede inventar el esquema | 422 |
 | SP-09 | **Sin conexion** durante el analisis | El analisis local **se completa**. Los resultados quedan en cola para enviarse | funciona, envio pendiente |
 | SP-10 | La **pestana se cierra** a mitad | El trabajo queda en `en_proceso`. El latido deja de llegar y la tarea de mantenimiento lo marca como `interrumpido` (HU-08) | HU-08 |
+| SP-11 | El backend recibe **dos riesgos con la misma `clave`** | 422. Significaria que el Reduce no consolido dos riesgos que son el mismo. Es un fallo del cliente, no se "arregla" reescribiendo la clave | 422 |
+| SP-12 | Un riesgo trae una **pagina de evidencia que no existe** en el documento | 422. Una evidencia que no se puede abrir no es evidencia | 422 |
+| SP-13 | Un riesgo trae una **pagina de evidencia que ningun bloque cubrio** | 422. La evidencia tiene que estar en el rango analizado | 422 |
 
 ---
 
@@ -255,6 +308,7 @@ bloques y el backend recibe 34, ambos coinciden.
 | EC-07 | El resumen parcial sale vacio | Se acepta. Un bloque sin texto puede no tener riesgos. Se distingue de un fallo: el bloque es valido, el contenido es vacio |
 | EC-08 | El JSON trae campos que no estan en el esquema | `extra = "forbid"` lo rechaza. Un campo inventado es un fallo de la plantilla, no algo que se acepte en silencio |
 | EC-09 | Dos bloques dan el mismo resumen | No es un error. El Reduce los consolida |
+| EC-10 | Un riesgo cae **exactamente en el corte** entre dos bloques | Aparece en los dos. El Reduce conserva la `clave` del primero y fusiona las paginas de `evidencia`. Sin eso, habria dos riesgos identicos con claves distintas |
 
 ### Casos "estupidos"
 
@@ -352,4 +406,30 @@ procesado. El PDF nunca se envia al backend para procesarse
 **Cuando** se analiza un documento
 **Entonces** el ETL y el Map-Reduce se completan
 **Y** solo el envio de resultados queda pendiente
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-13: Cada riesgo cumple el contrato
+**Dado** un analisis con riesgos
+**Cuando** el backend lo recibe
+**Entonces** cada riesgo tiene `clave`, `titulo`, `descripcion`, `datos`, `evidencia` y
+`confianza`
+**Y** las `clave` son unicas dentro del analisis
+**Y** `evidencia.paginas` son paginas que existen y que algun bloque cubrio
+**Y** `confianza` es `alta`, `media` o `baja`
+**Y** si algo no se cumple, responde 422 y no persiste nada
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-14: La clave es estable dentro del analisis
+**Dado** un riesgo que aparece en dos bloques por el solapamiento
+**Cuando** se reduce
+**Entonces** queda **un solo** riesgo, con la `clave` del primer bloque
+**Y** sus paginas de `evidencia` quedan fusionadas en una sola lista
+&nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
+
+### CA-15: El contenido de la plantilla no rompe el contrato
+**Dado** una plantilla con cualquier conjunto de campos de riesgo
+**Cuando** se extrae
+**Entonces** esos campos van **dentro de `datos`**
+**Y** el envoltorio (`clave`, `titulo`, `descripcion`, `evidencia`, `confianza`) es el mismo
+**Y** cambiar la plantilla **no** cambia la forma del resultado
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL

@@ -231,6 +231,7 @@ verdad: las dos se actualizan en el mismo commit.
 |---|---|
 | `docs/CONTEXTO.md` | Producto: que hace, para quien, con que restricciones |
 | `docs/ARQUITECTURA.md` | Stack, arquitectura, carpetas, modelo de datos, ADR |
+| `docs/CONTRATO-RESULTADO-ANALISIS.md` | La forma de un riesgo: el envoltorio nuestro y el contenido de la plantilla |
 | `docs/DECISIONES-PENDIENTES.md` | Preguntas abiertas con impacto y supuestos |
 | `docs/HU/` | Historias de usuario: camino feliz, caminos de error y criterios de aceptacion |
 | `docs/ARRANQUE.md` | Guia de arranque local: requisitos, comandos, orden de trabajo |

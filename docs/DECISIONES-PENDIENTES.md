@@ -374,9 +374,9 @@ que son documentos de trabajo y no la fuente de verdad.
 | PP-10 | **Quien puede pedir un reanálisis**: cualquiera con `documentos.analizar` o solo un admin | HU-10 variable `permitir_reanalisis` | Medio. Es una politica del cliente. El interruptor por organizacion ya esta previsto |
 | PP-11 | El **nombre definitivo del campo** que enlaza un analisis del historial con el que lo sustituyo | HU-10 seccion de modelo de datos | Bajo. Es una decision de la migracion. Se documenta `reemplazado_por` como nombre provisional |
 | PP-12 | La **duracion de la URL firmada** de descarga | HU-09 variable `duracion_url_firmada` | Bajo. Se asume 1 hora. Confirmar con el cliente |
-| PP-13 | Los **campos de riesgo concretos** que se extraen | HU-07 seccion 4, HU-10 comparacion de hallazgos, `docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md` §4 | **Alto.** Depende del cliente. Sin esto la plantilla de extraccion sigue siendo generica y la demo no muestra el valor real. **El analisis del prototipo aporta la forma, no la respuesta** |
+| PP-13 | Los **campos de riesgo concretos** que se extraen | HU-07 seccion 4, HU-10 comparacion de hallazgos, `docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md` §4, `docs/CONTRATO-RESULTADO-ANALISIS.md` | **Alto.** Depende del cliente. Sin esto la plantilla de extraccion sigue siendo generica y la demo no muestra el valor real. **El analisis del prototipo aporta la forma, no la respuesta** |
 | PP-14 | **Como se comparte el algoritmo de troceado** entre Python y TypeScript | ARQUITECTURA.md 1.2, `shared/chunking-casos.json` | Medio. La estructura de carpetas ya esta decidida; falta el mecanismo |
-| PP-15 | Si el **resultado del analisis tiene ciclo de vida** (estado, responsable, fecha, decision) o es solo una consulta | Analisis de referencia §6.2 | **Alto.** Depende del cliente. Si es si, cambia el modelo de datos y exige ADR |
+| PP-15 | Si el **resultado del analisis tiene ciclo de vida** (estado, responsable, fecha, decision) o es solo una consulta | Analisis de referencia §6.2, `docs/CONTRATO-RESULTADO-ANALISIS.md` | **Alto.** Depende del cliente. Si es si, cambia el modelo de datos y exige ADR |
 
 ### PP-14 — Como se comparte el troceado entre los dos lados
 
@@ -487,6 +487,23 @@ vivo despues de la entrega — quien responde, con que fecha, y si se acepta o s
 **Supuesto mientras no se cierre:** **consulta**. El alcance de la v1 es el pipeline y
 su resultado, y ampliarlo sin que el cliente lo pida seria construir un producto
 distinto por cuenta propia.
+
+### Lo que ya esta preparado para las dos
+
+El **contrato del resultado** (`docs/CONTRATO-RESULTADO-ANALISIS.md`) fija la forma de
+cada riesgo: un envoltorio nuestro (`clave`, `titulo`, `descripcion`, `evidencia`,
+`confianza`) y un contenido de la plantilla (`datos`).
+
+Eso no responde ni PP-13 ni PP-15, pero las deja mas faciles:
+
+- **PP-13** solo decide que va **dentro de `datos`**. El envoltorio no depende de eso.
+- **PP-15** solo decide que campos de gestion se anaden. La `clave` y la `evidencia` ya
+  estan para sostenerlos.
+
+Lo que **no** se hizo: tocar el modelo de datos. `riesgos` sigue siendo un `jsonb`, y la
+forma se documenta como contrato en vez de como columna. Si PP-15 se cierra con "si",
+ahi se decide si el contrato se materializa en columnas o se queda en el `jsonb` con
+validacion.
 
 ---
 
