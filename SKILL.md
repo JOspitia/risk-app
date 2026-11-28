@@ -1542,6 +1542,12 @@ def calcular_paginas_por_bloque(
 
     El resultado es una estimacion de partida. El limite real se comprueba por bloque
     con tokens estimados (seccion 10.2.2).
+
+    **Esta funcion no recibe `overlap_paginas`, y no es un olvido.** El solapamiento
+    no cambia cuantas paginas caben en la ventana: cambia **cuanto se avanza** entre
+    bloque y bloque. El tamano sale de los tokens (`utiles // tokens_por_pagina`), el
+    avance sale del solapamiento (`tamano - overlap`) y el numero de bloques sale de
+    ambos (`contar_bloques`). Son tres preguntas distintas, y por eso son tres funciones.
     """
     utiles = ventana_contexto - tokens_reservados
     if utiles <= 0:
