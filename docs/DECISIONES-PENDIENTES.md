@@ -5,7 +5,7 @@
 > cierre** y **que bloquea**.
 
 - **Estado:** vigente
-- **Ultima actualizacion:** 2026-11-27
+- **Ultima actualizacion:** 2026-11-28
 
 Cuando una pregunta se cierra: se responde aqui, se registra como ADR en
 [ARQUITECTURA.md](ARQUITECTURA.md#10-registro-de-decisiones-adr) y se actualiza el documento
@@ -375,6 +375,48 @@ que son documentos de trabajo y no la fuente de verdad.
 | PP-11 | El **nombre definitivo del campo** que enlaza un analisis del historial con el que lo sustituyo | HU-10 seccion de modelo de datos | Bajo. Es una decision de la migracion. Se documenta `reemplazado_por` como nombre provisional |
 | PP-12 | La **duracion de la URL firmada** de descarga | HU-09 variable `duracion_url_firmada` | Bajo. Se asume 1 hora. Confirmar con el cliente |
 | PP-13 | Los **campos de riesgo concretos** que se extraen | HU-07 seccion 4, HU-10 comparacion de hallazgos | **Alto.** Depende del cliente. Sin esto la plantilla de extraccion sigue siendo generica y la demo no muestra el valor real |
+| PP-14 | **Como se comparte el algoritmo de troceado** entre Python y TypeScript | ARQUITECTURA.md 1.2, `shared/chunking-casos.json` | Medio. La estructura de carpetas ya esta decidida; falta el mecanismo |
+
+### PP-14 — Como se comparte el troceado entre los dos lados
+
+**Que se decide.** El algoritmo de troceado existe en los dos lados: Python calcula el
+tamano de bloque desde la ventana del modelo, y TypeScript trocea el PDF en el
+navegador. Python y TypeScript no pueden importar el mismo archivo.
+
+**Por que importa.** Si los dos lados divergen, el sintoma no es "el bloque es
+distinto": es que un bloque que el backend espera de 3 paginas llega con 4, el Reduce
+mezcla paginas que no pertenecen al mismo contexto, y el analisis sale con datos
+contradictorios entre bloques. En el navegador eso es muy dificil de diagnosticar.
+
+**Lo que ya esta decidido** (`[DECIDIDO]`, no es parte de esta pregunta):
+
+- El algoritmo vive en los dos lados, en codigo propio de cada uno.
+- La **verificacion** es compartida: `shared/chunking-casos.json` tiene entradas y
+  salidas esperadas, y las corre `pytest` en Python y `vitest` en TypeScript. Si los dos
+  lados divergen, uno de los dos falla. Eso es exactamente el error que quiero que se
+  detecte.
+
+**Lo que falta decidir.** El **mecanismo** de compartir el codigo, que tiene tres vias:
+
+| Via | Como funciona | A favor | En contra |
+|---|---|---|---|
+| **A. Codigo duplicado + casos dorados** | Cada lado tiene su implementacion; `shared/chunking-casos.json` obliga a que se comporten igual | Simple, sin dependencias, sin paso de build | Hay que mantener dos codigos; el caso dorado solo detecta la divergencia si alguien **anade** el caso |
+| B. Generar TypeScript desde Python | Un script genera el `.ts` a partir del `.py` | Una sola fuente de verdad | Un paso de build que puede quedar viejo; acopla el frontend a Python |
+| C. Paquete compartido publicado | Un paquete npm y uno PyPI con el mismo origen | Una sola fuente de verdad, sin paso de build | Dos artefactos que publicar y versionar; overkill para una funcion pura |
+
+**Supuesto mientras no se cierre:** **A**, porque es la que ya esta documentada en
+`ARQUITECTURA.md` 1.2 y en `SKILL.md` 10.2, y porque la funcion es pura y pequena: unas
+60 lineas. El riesgo de A es que el caso dorado no explore por si solo: la disciplina de
+**anadir un caso por cada cambio en laformula** es la que lo mitiga. Cuando la funcion
+crezca o los casos dorados superen el dozens, se revisa hacia B.
+
+**Que bloquea.** Nada critico: la opcion A funciona desde el primer dia. Solo bloquea si
+mas adelante se quiere B o C, y eso seria una migracion pequena.
+
+**Lo que hay que preguntarle al cliente cuando toque.** Nada: es una decision tecnica
+interna. La unica pregunta relevante es si el proyecto llegara a tener varios
+consumidores del algoritmo (por ejemplo, un script en Node para el worker), y eso lo
+dice el volumen de trabajo, no el cliente.
 
 **Supuesto mientras no se cierren:** se implementa lo minimo que las HU de la v1 necesitan.
 PP-01 es el unico que toca el modelo de datos, y la decision ya esta tomada en el sentido de
