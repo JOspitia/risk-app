@@ -1336,15 +1336,40 @@ el resumen ejecutivo**, y ese JSON es lo que se guarda y lo que se consulta.
 {
   "documento_id": "...",
   "plantilla": { "id": "...", "version": 1 },
-  "total_bloques": 34,
+  "total_bloques": 50,
   "resumenes": [
     { "indice": 0, "paginas": "1-3", "resumen": "...", "datos": { } },
     { "indice": 1, "paginas": "4-6", "resumen": "...", "datos": { } }
   ],
   "resumen_ejecutivo": "...",
-  "riesgos": [ ]
+  "riesgos": [
+    {
+      "clave": "r-3f9a2c",
+      "titulo": "Manejo de credenciales sin cifrar",
+      "descripcion": "Las credenciales aparecen en texto plano en la seccion 4.2.",
+      "datos": { "categoria": "Seguridad", "severidad": "Alta" },
+      "evidencia": { "paginas": [12, 13], "cita": "El sistema almacena las claves en texto plano." },
+      "confianza": "alta"
+    }
+  ]
 }
 ```
+
+**El contrato del resultado.** Cada elemento de `riesgos` tiene una forma **fija**, con
+un envoltorio nuestro y un contenido del cliente:
+
+- **Envolvtorio (nuestro):** `clave`, `titulo`, `descripcion`, `evidencia`, `confianza`.
+- **Contenido (de la plantilla):** `datos`, que es donde viven los campos de riesgo que
+  el cliente defina (`severidad`, `categoria`, `cvss`...).
+
+El contrato completo, con el porque de cada campo, esta en
+[`CONTRATO-RESULTADO-ANALISIS.md`](CONTRATO-RESULTADO-ANALISIS.md).
+
+**Por que importa ahora, cuando la fase de gestion todavia no existe.** La `clave` es
+estable dentro de un analisis, lo que permite comparar dos analisis del mismo documento
+y anadirle historial despues. Y `evidencia` obliga a que cada riesgo apunte a la pagina
+del documento donde esta: un riesgo sin pagina no es verificable por el usuario, que es
+justo el motivo por el que subio el PDF.
 
 **Como se guarda.** `analisis_documentos.resumenes` (JSONB) guarda el arreglo completo;
 `resumen_ejecutivo` y `riesgos` se separan porque se consultan y filtran distinto. Los
@@ -1359,12 +1384,26 @@ class ResumenBloqueResource(BaseModel):
     paginas: str
     resumen: str
 
+class EvidenciaResource(BaseModel):
+    """Donde esta el riesgo en el documento. Sin esto no es verificable."""
+    paginas: list[int]
+    cita: str | None = None
+
+class RiesgoResource(BaseModel):
+    """Un riesgo del analisis. El envoltorio es fijo; `datos` lo define la plantilla."""
+    clave: str
+    titulo: str
+    descripcion: str
+    datos: dict
+    evidencia: EvidenciaResource
+    confianza: Literal["alta", "media", "baja"]
+
 class AnalisisResource(BaseModel):
     """Lo que el cliente ve del analisis. La frontera de seguridad."""
     documento_id: UUID
     total_bloques: int
     resumen_ejecutivo: str | None
-    riesgos: list[dict]
+    riesgos: list[RiesgoResource]
     resumenes: list[ResumenBloqueResource]
     plantilla_version: int | None
 

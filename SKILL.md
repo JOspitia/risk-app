@@ -1833,12 +1833,21 @@ ejecutivo**. Ese JSON es lo que se guarda y lo que se consulta.
 {
   "documento_id": "...",
   "plantilla": { "id": "...", "version": 1 },
-  "total_bloques": 34,
+  "total_bloques": 50,
   "resumenes": [
     { "indice": 0, "paginas": "1-3", "resumen": "...", "datos": { } }
   ],
   "resumen_ejecutivo": "...",
-  "riesgos": [ ]
+  "riesgos": [
+    {
+      "clave": "r-3f9a2c",
+      "titulo": "Manejo de credenciales sin cifrar",
+      "descripcion": "Las credenciales aparecen en texto plano en la seccion 4.2.",
+      "datos": { "categoria": "Seguridad", "severidad": "Alta" },
+      "evidencia": { "paginas": [12, 13], "cita": "El sistema almacena las claves en texto plano." },
+      "confianza": "alta"
+    }
+  ]
 }
 ```
 
@@ -1854,15 +1863,40 @@ class ResumenBloqueResource(BaseModel):
     paginas: str
     resumen: str
 
+class EvidenciaResource(BaseModel):
+    """Donde esta el riesgo en el documento. Sin esto no es verificable."""
+    paginas: list[int]
+    cita: str | None = None
+
+class RiesgoResource(BaseModel):
+    """Un riesgo. El envoltorio es fijo; `datos` lo define la plantilla."""
+    clave: str
+    titulo: str
+    descripcion: str
+    datos: dict
+    evidencia: EvidenciaResource
+    confianza: Literal["alta", "media", "baja"]
+
 class AnalisisResource(BaseModel):
     """Lo que el cliente ve del analisis. La frontera de seguridad."""
     documento_id: UUID
     total_bloques: int
     resumen_ejecutivo: str | None
-    riesgos: list[dict]
+    riesgos: list[RiesgoResource]
     resumenes: list[ResumenBloqueResource]
     plantilla_version: int | None
 ```
+
+**El contrato del resultado.** El `jsonb` de `riesgos` tiene una forma **fija**:
+`clave`, `titulo`, `descripcion`, `evidencia` y `confianza` son **nuestros**;
+`datos` es **de la plantilla** y ahi viven los campos de riesgo que defina el cliente.
+
+Esa division es lo que permite que PP-13 se cierre de cualquier forma sin romper lo ya
+construido, y lo que deja preparada la fase de gestion: la `clave` es estable dentro de
+un analisis y la `evidencia` permite verificar el riesgo en la pagina del documento.
+
+El contrato completo, con el porque de cada campo y las reglas de validacion, esta en
+[`docs/CONTRATO-RESULTADO-ANALISIS.md`](docs/CONTRATO-RESULTADO-ANALISIS.md).
 
 Reglas:
 
@@ -1870,6 +1904,9 @@ Reglas:
 - El DTO no contiene logica de negocio ni acceso a datos.
 - El `JSONB` de la base es un detalle de persistencia. El DTO es el contrato publico: si el
   JSON cambia de forma, el DTO absorbe el cambio y el frontend no se entera.
+- El backend valida el envoltorio **ademas** del contenido: `clave` unica, paginas de
+  `evidencia` dentro del documento y cubiertas por algun bloque, `confianza` de un valor
+  permitido. El cliente no es una frontera de confianza.
 
 **El `indice` de bloque y el rango de paginas no son decoracion.** Cuando el sistema guarde
 registros para responder preguntas (RAG), los resumenes por bloque son los fragmentos que
