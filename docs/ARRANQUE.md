@@ -190,7 +190,10 @@ Las que existen hoy:
 | `005_funciones_rpc.sql` | Las funciones de atomicidad: `guardar_analisis`, `registrar_actividad`, `actualizar_trabajo`, `mis_permisos`, `revocar_sesion` |
 | `006_advisor_supabase.sql` | Las correcciones que pidio el advisor oficial: indice en cada FK, `(select auth.uid())` en las politicas, y las politicas unificadas |
 | `007_politicas_por_operacion.sql` | Cada politica `for all` partida en `for insert`, `for update` y `for delete` |
-| `008_funciones_fuera_de_alcance_anon.sql` | Las funciones RPC al esquema `security`, `EXECUTE` revocado a `anon`, y `FORCE ROW LEVEL SECURITY` en las 17 tablas |
+| `008_funciones_fuera_de_alcance_anon.sql` | Las funciones RPC fuera del alcance del rol `anon`, y `FORCE ROW LEVEL SECURITY` en las 17 tablas |
+| `009_cerrar_funciones_al_rol_public.sql` | `EXECUTE` revocado al rol `public` en las funciones de apoyo y en las cinco RPC, y `USAGE` revocado al rol `public` en el esquema `security` |
+| `010_funciones_rpc_en_public.sql` | Las cinco RPC de negocio vuelven a `public` con el ACL cerrado (ADR-37): `EXECUTE` solo para `authenticated` |
+| `011_cerrar_esquema_security_al_rol_anon.sql` | `USAGE` y `EXECUTE` revocados a `anon` explicitamente en el esquema `security` y en sus nueve funciones de apoyo |
 
 Ademas, `supabase/seed.sql` siembra la **plantilla generica v1** (plantilla del
 sistema, visible para todos). No siembra usuarios ni organizaciones: el primer
@@ -431,13 +434,18 @@ sin que haya que repetir el `--project-ref`.
 ### 7.3 Aplicar el esquema
 
 ```bash
-supabase db push --yes
+supabase db push --remote --password "<contrasena de postgres>" --yes
 ```
 
 Esto aplica **el mismo SQL** del directorio `supabase/migrations/` que se valido en
 local. No hay conversion: el mismo archivo que se aplico con `db reset` local es el
 que se aplica aqui. Por eso el item del Gate 1 sobre `supabase db push` es el que
 falta cerrar.
+
+> **La contrasena de Postgres no es la del administrador de la app.** Son dos cosas
+> distintas: la de Postgres abre la conexion para aplicar migraciones, y la del
+> administrador es la que se usa para entrar a la aplicacion. La CLI la pide en
+> cada `db push` si no se la pasas con `--password`.
 
 ### 7.4 Configurar el backend
 
@@ -496,6 +504,41 @@ Es el mismo advisor que se corrio en local, pero contra el proyecto de la nube. 
 no reporta ningun WARN ni ERROR, el esquema desplegado cumple lo mismo que el
 validado.
 
+> **Los seis WARN que quedan son intencionales.** Verificado el 2026-11-28 contra el
+> proyecto `risk-app`:
+>
+> - `authenticated_security_definer_function_executable` (5): las cinco funciones RPC
+>   de negocio (`guardar_analisis`, `registrar_actividad`, `actualizar_trabajo`,
+>   `mis_permisos`, `revocar_sesion`) son `security definer` en `public` y
+>   `authenticated` debe poder llamarlas: son la via de escritura del pipeline y la
+>   via de lectura de los permisos del usuario (ADR-37). La propia remediacion del
+>   linter dice: muevala fuera del esquema expuesto **solo si los usuarios con sesion
+>   no deberian poder llamarla**.
+> - `auth_leaked_password_protection` (1): es una opcion de Supabase Auth
+>   (HaveIBeenPwned), se activa en el panel. No es del esquema.
+
+### 7.7 El proyecto que esta desplegado
+
+Verificado el 2026-11-28 contra el proyecto `risk-app`:
+
+| Que | Valor |
+|---|---|
+| Project ref | `tygzjraxknlwyllkabid` |
+| URL | `https://tygzjraxknlwyllkabid.supabase.co` |
+| Migraciones aplicadas | 11 (`001` a `011`) |
+| Tablas con RLS | 17, todas con `FORCE ROW LEVEL SECURITY` |
+| Politicas | 49 |
+| Permisos | 14, en 3 roles |
+| Plantillas | 1 (la generica v1) |
+| Administrador | `admin@ejemplo.com`, rol `admin`, organizacion "Equipo inicial" |
+
+Comprobaciones hechas contra ese proyecto:
+
+- `POST /rest/v1/rpc/mis_permisos` sin token -> `401` `42501 permission denied`.
+- La misma llamada con el JWT del administrador -> `200` con los 14 permisos de `admin`.
+- `GET /rest/v1/perfiles` sin token -> `200` con 0 filas; con token -> 1 fila.
+- `POST /rest/v1/rpc/revocar_sesion` sobre la sesion de otro usuario -> `403` `42501`.
+
 ---
 
 ## 8. Orden de trabajo
@@ -505,7 +548,7 @@ El proyecto es incremental y cada capa se apoya en la anterior:
 | # | Bloque | Estado | Gates que lo cubren |
 |---|---|---|---|
 | 1 | **Esqueleto**: estructura, configuracion, dependencias | **Hecho** | Gate 14 |
-| 2 | **Migracion**: esquema, RLS, matriz de permisos y bucket, contra una base vacia | Siguiente | Gate 1, 2, 3.1, 3.4 |
+| 2 | **Migracion**: esquema, RLS, matriz de permisos y bucket, contra una base vacia | **Hecho** | Gate 1, 2, 3.1, 3.4 |
 | 3 | **Contratos**: envelope, codigos de estado, paginacion y OpenAPI | Pendiente | Gate 5, 9 |
 | 4 | **Adaptadores**: Supabase, almacenamiento, correo | Pendiente | Gate 3, 4 |
 | 5 | **Casos de uso**: permisos, transacciones, auditoria | Pendiente | Gate 3.1, 3.2, 4 |
