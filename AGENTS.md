@@ -128,32 +128,49 @@ El arbol completo esta en `docs/ARQUITECTURA.md` seccion 3. Version resumida:
 backend/app/
   domain/        entidades, value objects, ports, reglas puras, errores
   application/   casos de uso, DTOs, auditoria, unit of work
-  adapters/      http/ db/ llm/ etl/ storage/ queue/
+  adapters/      http/ supabase/ llm/ etl/ storage/ queue/
   worker/        consumidor de la cola
 frontend/src/
-  api/ stores/ views/ components/ workers/
+  api/ stores/ views/ components/ workers/ shared/
 ```
 
 ---
 
 ## 5. Comandos
 
-Los nombres exactos se fijan al crear el `pyproject.toml`. Convencion:
+Los comandos exactos. La guia completa de arranque esta en
+[`docs/ARRANQUE.md`](docs/ARRANQUE.md).
 
 ```
+# Backend (en backend/)
 uv sync                # instala dependencias
-supabase db reset      # aplica las migraciones en la base local (ADR-32)
-supabase db push       # aplica las migraciones en el proyecto de Supabase
 uv run pytest          # suite completa
 uv run pytest -m unit  # solo unitarias, sin base de datos
 uv run ruff check .    # lint
+uv run ruff format .   # formato
 uv run mypy app        # tipos
-npm run dev            # frontend (en frontend/)
+uv run lint-imports    # contratos de la frontera hexagonal
+
+# Migraciones (en la raiz)
+supabase db reset      # aplica las migraciones en la base local (ADR-32)
+supabase db push       # aplica las migraciones en el proyecto de Supabase
+
+# Frontend (en frontend/)
+npm install --legacy-peer-deps  # ver docs/ARRANQUE.md: openapi-typescript exige TS 5
+npm run dev            # servidor de desarrollo
+npm run typecheck      # vue-tsc sobre los .vue
+npm run build          # typecheck + build de produccion
 npm run test           # tests del frontend
+npm run lint           # eslint
+npm run api:types      # regenera los tipos desde el OpenAPI del backend
 ```
 
 > Si un comando de build solo compila las fuentes de produccion, no se usa para validar. Un
 > build que no incluye los tests reporta exito con los tests rotos.
+
+> **`lint-imports` no es opcional.** Es el que verifica la invariante hexagonal: el
+> `domain/` no importa nada de `application/`, `adapters/` ni de frameworks. Una
+> violacion rompe la integracion continua antes de que rompa la revision.
 
 ---
 

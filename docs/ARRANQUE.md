@@ -1,8 +1,8 @@
 # Arranque local
 
 Como se levanta Risk-app en una maquina nueva. El detalle de **que** es el producto
-esta en [docs/CONTEXTO.md](docs/CONTEXTO.md); el de **como** esta en
-[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+esta en [CONTEXTO.md](CONTEXTO.md); el de **como** esta en
+[ARQUITECTURA.md](ARQUITECTURA.md).
 
 ---
 
@@ -42,7 +42,7 @@ La API queda en `http://localhost:8000` y la documentacion interactiva en
 configuracion incompleta que arranca es peor que una que se niega a arrancar,
 porque el fallo aparece en produccion y no en el desarrollo.
 
-### Comandos de verificacion
+### Comandos de verificacion del backend
 
 ```bash
 uv run pytest              # suite completa
