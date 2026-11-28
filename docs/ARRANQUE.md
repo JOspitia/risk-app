@@ -42,6 +42,49 @@ La API queda en `http://localhost:8000` y la documentacion interactiva en
 configuracion incompleta que arranca es peor que una que se niega a arrancar,
 porque el fallo aparece en produccion y no en el desarrollo.
 
+### Los dos `.env` y el de Supabase
+
+Hay **tres** lugares donde viven las claves, y se confunden con facilidad:
+
+| Archivo | Para que | Se versiona |
+|---|---|---|
+| `backend/.env` | La API: URL y llaves de Supabase | **No.** Esta en `.gitignore` |
+| `frontend/.env` | El navegador: la URL y la llave publicable | **No** |
+| `supabase/` (el CLI) | La base local que levanta el CLI | El codigo si; las llaves no |
+
+**Supabase no usa "un `.env` propio": el CLI de Supabase administra el suyo.** El
+stack local (`supabase start`) tiene sus propias llaves, y estan en la salida del
+comando:
+
+```
+supabase start
+# API URL: http://127.0.0.1:54321
+# Publishable key: sb_publishable_...
+# Secret key: sb_secret_...
+```
+
+El `backend/.env` apunta a **esa** API local mientras se desarrolla en local:
+
+```
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_ANON_KEY=sb_publishable_...        # la llave que imprime `supabase start`
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...      # la llave que imprime `supabase start`
+```
+
+Cuando se trabaja contra el **proyecto en la nube**, cambian las dos llaves por las
+del panel de Supabase (`Project Settings -> API`), y la URL pasa a
+`https://<project-ref>.supabase.co`.
+
+**Que NO hay que hacer:** poner las llaves de la nube en un archivo versionado, ni
+copiar el `.env` de la nube sobre el del stack local sin avisar. Son dos entornos
+distintos, con dos conjuntos de datos distintos.
+
+> **La diferencia entre las dos llaves de la nube.** La `anon` (hoy `publishable`)
+> es la que viaja al navegador y la que aplica las politicas de RLS: el RLS es lo
+> que protege los datos. La `service_role` salta el RLS, asi que **nunca** va al
+> navegador ni a un `.env` del frontend. El backend la usa solo en el adaptador de
+> administracion (ADR-13).
+
 ### Comandos de verificacion del backend
 
 ```bash
@@ -134,6 +177,8 @@ Las que existen hoy:
 | `003_permisos_y_roles.sql` | Los 3 roles, los 14 permisos y la matriz `rol_permisos` |
 | `004_bucket_y_storage.sql` | El bucket privado `documentos` y las politicas sobre `storage.objects` |
 | `005_funciones_rpc.sql` | Las funciones de atomicidad: `guardar_analisis`, `registrar_actividad`, `actualizar_trabajo`, `mis_permisos`, `revocar_sesion` |
+| `006_advisor_supabase.sql` | Las correcciones que pidio el advisor oficial: indice en cada FK, `(select auth.uid())` en las politicas, y las politicas unificadas |
+| `007_politicas_por_operacion.sql` | Cada politica `for all` partida en `for insert`, `for update` y `for delete` |
 
 Ademas, `supabase/seed.sql` siembra la **plantilla generica v1** (plantilla del
 sistema, visible para todos). No siembra usuarios ni organizaciones: el primer
@@ -141,6 +186,20 @@ administrador lo crea el script de bootstrap.
 
 > `supabase db reset` **borra** los datos de la base local. Es lo esperado: rehace
 > el esquema desde cero.
+
+> **El advisor de Supabase.** `supabase db advisors` revisa la base con las mismas
+> reglas que usa la plataforma. Sirve para comprobar que lo escrito aca es lo que
+> Supabase espera, no solo lo que el proyecto espera:
+>
+> ```bash
+> supabase db advisors --type all --level info
+> ```
+>
+> La primera pasada dio 56 hallazgos (37 de `auth_rls_initplan`, 16 de
+> `unindexed_foreign_keys`, 14 de `unused_index`, 7 de
+> `multiple_permissive_policies`). Las migraciones 006 y 007 los corrigen. Quedan 29
+> de nivel INFO: indices que el advisor no ve en uso porque la base esta vacia y el
+> planificador no tiene datos para decidir. Ninguno se borra por eso.
 
 > **El esquema `security`.** Las politicas de RLS no pueden consultarse entre si: la
 > de `documentos` llama a la de `documentos_compartidos`, que vuelve a consultar
@@ -225,7 +284,164 @@ al final de la ejecucion.
 
 ---
 
-## 6. Orden de trabajo
+## 6. Docker
+
+El `Dockerfile` del backend existe para dos cosas (ADR-07, `ARQUITECTURA.md`
+seccion 9.1):
+
+1. **Entorno local reproducible**, identico al de produccion, sin depender de que
+   el desarrollador tenga Python 3.14.10 y las dependencias bien instaladas.
+2. **Camino de salida a servidor privado ya escrito.** Si manana se anade el modo
+   hospedado (el worker ETL con LLM), la imagen ya existe y ya esta probada.
+
+> **Vercel no ejecuta este Dockerfile en produccion.** El runtime de Python de
+> Vercel compila desde el codigo fuente. La produccion v1 es Vercel + Supabase.
+
+### 6.1 Solo el backend
+
+```bash
+cd backend
+docker build -t risk-app-backend .
+docker run --rm -p 8000:8000 \
+    -e SUPABASE_URL=http://127.0.0.1:54321 \
+    -e SUPABASE_ANON_KEY=<clave> \
+    -e SUPABASE_SERVICE_ROLE_KEY=<clave> \
+    -e CORS_ORIGINS=http://localhost:5173 \
+    risk-app-backend
+```
+
+El contenedor arranca con el usuario `riskapp` (uid 1001), no como `root`, y su
+`HEALTHCHECK` consulta `/health`. Para ver el estado:
+
+```bash
+docker inspect risk-app-backend --format '{{.State.Health.Status}}'
+```
+
+### 6.2 El entorno completo
+
+`docker compose up -d` levanta Supabase (Postgres, Auth, Storage, PostgREST) y el
+backend. **El frontend no se levanta en Docker**: se sirve con `npm run dev`, que
+reloja en caliente, y el inspector del navegador no llega al contenedor.
+
+Lo que **no** hace el compose: aplicar migraciones. Se aplican con el CLI, que es
+la unica herramienta de migraciones del proyecto (ADR-32):
+
+```bash
+supabase db reset          # recrea el esquema desde cero
+supabase db push --local   # aplica solo las migraciones nuevas
+```
+
+### 6.3 Lo que se optimizo en la imagen
+
+| decision | por que |
+|---|---|
+| Multi-stage | La etapa final no lleva el compilador ni las cabeceras que `uv` necesita |
+| `uv` ausente de la etapa final | Pesa 43,8 MB y en runtime no se usa |
+| Cache de `uv` limpio tras instalar | Sin esto, la imagen lleva dos copias de lo descargado |
+| Capas ordenadas por frecuencia de cambio | `pyproject.toml` cambia poco; `app/` cambia todos los dias |
+| `COPY --chown` de una vez | Evita un `chown` recursivo despues |
+| `.dockerignore` | Sin el, el `.venv` y el `.env` viajan dentro del contexto de build |
+
+Resultado: **337 MB**. El `.venv` pesa 124 MB y casi todo es transitive del SDK de
+Supabase (`opentelemetry`, `sentry_sdk`, `google`, `rich`, `pygments`, `uvloop`,
+`cryptography`). Quitarlo exigiria recortar el SDK, que es dependencia directa
+(ADR-05): un recorte de tamano no puede costar una funcionalidad.
+
+### 6.4 El `uv.lock` es obligatorio en la imagen
+
+`uv sync --frozen` se niega a instalar sin el lockfile. Sin `uv.lock` dentro de la
+imagen, la construccion resolveria las dependencias en ese momento, y dos
+construcciones en dias distintos podrian instalar versiones distintas. El
+`Dockerfile` copia `pyproject.toml` **y** `uv.lock` por eso.
+
+---
+
+## 7. El proyecto en la nube
+
+El proyecto en la nube es el que se usa para el despliegue. **El CLI de Supabase
+administra su propia configuracion**: no hay un `.env` para el, hay un enlace.
+
+### 7.1 Que hace falta
+
+| Que | Donde sale |
+|---|---|
+| El **project ref** | El panel: `Project Settings -> General -> Reference ID`. Es el identificador del proyecto, del tipo `abcdefghijklmnopqrst` |
+| El **access token** | El panel: `Account Preferences -> Access Tokens`. Lo genera la plataforma |
+| La **contrasena de la base de datos** | El panel: `Project Settings -> Database -> Postgres` |
+
+El project ref es lo unico que el CLI necesita para **enlazar** el proyecto. El
+access token es lo que lo autoriza a hablar con la plataforma.
+
+### 7.2 El enlace
+
+```bash
+supabase login                              # pide el access token, o:
+$env:SUPABASE_ACCESS_TOKEN = "<token>"      # en Powershell
+
+supabase link --project-ref <project-ref>
+```
+
+El enlace guarda la referencia en `supabase/.temp/`, que esta en `.gitignore`. A
+partir de ahi, `supabase db push` y `supabase db advisors` ya apuntan al proyecto
+sin que haya que repetir el `--project-ref`.
+
+### 7.3 Aplicar el esquema
+
+```bash
+supabase db push --yes
+```
+
+Esto aplica **el mismo SQL** del directorio `supabase/migrations/` que se valido en
+local. No hay conversion: el mismo archivo que se aplico con `db reset` local es el
+que se aplica aqui. Por eso el item del Gate 1 sobre `supabase db push` es el que
+falta cerrar.
+
+### 7.4 Configurar el backend
+
+Las variables del `backend/.env` cambian a las del proyecto en la nube:
+
+```
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<publishable key del panel>
+SUPABASE_SERVICE_ROLE_KEY=<secret key del panel>
+```
+
+Y el `frontend/.env` lleva la URL y la llave **publicable**:
+
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<publishable key del panel>
+```
+
+> **El secret key no viaja al navegador.** Va solo en el backend, y ahi solo lo usa
+> el adaptador de administracion (ADR-13).
+
+### 7.5 Crear el primer administrador
+
+Con el proyecto enlazado, el bootstrap se corre contra la nube:
+
+```bash
+cd backend
+uv run python -m scripts.bootstrap_admin \
+    --correo admin@ejemplo.com \
+    --organizacion "<nombre de la organizacion>"
+```
+
+El script imprime la contrasena temporal si no se le pasa una.
+
+### 7.6 Comprobar el proyecto enlazado
+
+```bash
+supabase db advisors --remote --type all --level warn
+```
+
+Es el mismo advisor que se corrio en local, pero contra el proyecto de la nube. Si
+no reporta ningun WARN ni ERROR, el esquema desplegado cumple lo mismo que el
+validado.
+
+---
+
+## 8. Orden de trabajo
 
 El proyecto es incremental y cada capa se apoya en la anterior:
 
