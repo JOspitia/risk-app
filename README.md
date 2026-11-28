@@ -222,6 +222,7 @@ correos por hora** y solo al equipo, y Vercel Hobby es de uso **personal o no co
 | `frontend/` | Codigo de la SPA (Vue 3.5, Vite 8). `src/`, `workers/` | Al tocar el frontend |
 | `supabase/` | `config.toml` y `migrations/*.sql`: el **esquema** del proyecto | Al tocar el modelo de datos |
 | `shared/` | Fixtures compartidas entre Python y TypeScript (casos dorados del chunking) | Al tocar el troceado |
+| `referencias/` | Codigo de terceros clonado **solo para leer**. El analisis esta en `docs/` | Antes de implementar una funcionalidad similar |
 | `docs/legacy/` | Los documentos originales sin procesar | Solo como referencia historica. **No se editan** |
 
 ### 7.1 Orden de lectura para trabajar
