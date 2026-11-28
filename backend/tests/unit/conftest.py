@@ -65,17 +65,44 @@ class BaseDeDatosFalsa:
     revocaciones: list[dict[str, Any]] = field(default_factory=list)
     auditoria: list[dict[str, Any]] = field(default_factory=list)
     peticiones: list[httpx.Request] = field(default_factory=list)
+    # La vista `public.salud`. `None` simula que la migracion todavia no esta
+    # aplicada: PostgREST responde 404, que es lo que responde de verdad.
+    salud: list[dict[str, Any]] | None = field(
+        default_factory=lambda: [{"roles_cargados": 3, "permisos_cargados": 14}]
+    )
+    # Los cambios que se le pidieron a `perfiles`.
+    cambios_de_perfil: list[dict[str, Any]] = field(default_factory=list)
+    # Cuando es True, la base no responde: se simula que Supabase no esta.
+    caida: bool = False
 
     def manejar(self, request: httpx.Request) -> httpx.Response:
         self.peticiones.append(request)
         ruta = request.url.path
 
+        if self.caida:
+            raise httpx.ConnectError("la base de datos no responde", request=request)
+
         if ruta.endswith("/perfiles"):
+            if request.method == "PATCH":
+                self.cambios_de_perfil.append(
+                    {"filtros": dict(request.url.params), "cuerpo": _cuerpo(request)}
+                )
+                return httpx.Response(204)
             return _json([self.perfil] if self.perfil else [])
         if ruta.endswith("/organizaciones_miembros"):
             return _json([self.membresia] if self.membresia else [])
         if ruta.endswith("/sesiones_revocadas"):
             return _json(self.sesiones_revocadas)
+        if ruta.endswith("/salud"):
+            if self.salud is None:
+                return httpx.Response(
+                    404,
+                    json={
+                        "code": "PGRST205",
+                        "message": "Could not find the table 'public.salud'",
+                    },
+                )
+            return _json(self.salud)
         if ruta.endswith("/rpc/revocar_sesion"):
             self.revocaciones.append(_cuerpo(request))
             return httpx.Response(204)

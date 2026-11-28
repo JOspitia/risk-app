@@ -74,6 +74,7 @@ class ClienteDatos:
         filtros: dict[str, str],
         orden: str | None = None,
         limite: int | None = None,
+        timeout: float | None = None,
     ) -> list[dict[str, Any]]:
         """Una consulta parametrizada. Devuelve las filas o una lista vacia.
 
@@ -83,6 +84,10 @@ class ClienteDatos:
 
         Los valores viajan como **parametros** de la peticion, no concatenados
         en la URL: `httpx` los codifica, y PostgREST los trata como datos.
+
+        `timeout` acorta el tiempo de espera de **esta** peticion. Lo usa la
+        sonda de disponibilidad, que no puede quedarse esperando: una sonda
+        que tarda lo que tarda la base ya no es una sonda.
         """
         params: dict[str, str] = {"select": columnas}
         params.update(filtros)
@@ -91,10 +96,46 @@ class ClienteDatos:
         if limite is not None:
             params["limit"] = str(limite)
 
-        respuesta = await self.http.get(tabla, params=params, headers=self._cabeceras())
+        if timeout is None:
+            respuesta = await self.http.get(
+                tabla,
+                params=params,
+                headers=self._cabeceras(),
+            )
+        else:
+            # `timeout=None` en `httpx` significa "sin espera", no "el de por
+            # defecto": por eso el caso sin timeout va en su propia rama.
+            respuesta = await self.http.get(
+                tabla,
+                params=params,
+                headers=self._cabeceras(),
+                timeout=timeout,
+            )
         _verificar(respuesta)
         cuerpo = respuesta.json()
         return list(cuerpo) if isinstance(cuerpo, list) else []
+
+    async def actualizar(
+        self,
+        tabla: str,
+        filtros: dict[str, str],
+        cambios: dict[str, Any],
+    ) -> None:
+        """Una actualizacion parametrizada. Devuelve el error si la politica la rechaza.
+
+        Los filtros son la **expresion completa** de PostgREST, como en
+        `seleccionar`, y los cambios viajan como parametros del cuerpo.
+
+        La politica de RLS es la que decide a que filas llega la escritura: la
+        peticion lleva el JWT del usuario, no la llave de servicio.
+        """
+        respuesta = await self.http.patch(
+            tabla,
+            params=filtros,
+            json=cambios,
+            headers=self._cabeceras(),
+        )
+        _verificar(respuesta)
 
     async def insertar(self, tabla: str, fila: dict[str, Any]) -> None:
         """Una escritura. Devuelve el error si la politica la rechaza."""

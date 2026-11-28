@@ -17,6 +17,14 @@ COLUMNAS_PERFIL = (
     "organizacion_id, debe_cambiar_contrasena, activo"
 )
 
+# `perfiles`: la unica columna que escribe el backend al confirmar el cambio
+# de credencial. Vive aqui con las demas para que la escritura no se disperse
+# por el codigo: si el nombre de la columna cambia, cambia en un solo lugar.
+COLUMNAS_CONFIRMACION_CONTRASENA = "debe_cambiar_contrasena"
+
+# `public.salud`: la vista publica que confirma que el esquema esta aplicado.
+COLUMNAS_SALUD = "roles_cargados, permisos_cargados"
+
 # `organizaciones_miembros`: la pertenencia que define el aislamiento (ADR-33).
 COLUMNAS_MEMBRESIA = "organizacion_id, rol"
 

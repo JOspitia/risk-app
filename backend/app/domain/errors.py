@@ -85,6 +85,20 @@ class ConflictoError(ErrorDominio):
     mensaje = "La operacion entra en conflicto con el estado actual"
 
 
+class ServicioNoDisponibleError(ErrorDominio):
+    """El servicio no puede atender peticiones en este momento.
+
+    Lo levanta la sonda de disponibilidad: la base de datos no responde, o el
+    esquema todavia no esta aplicado. Es 503 y no 500 porque **no es un fallo
+    del proceso**: el proceso esta vivo y por eso `/health` sigue respondiendo
+    200.
+    """
+
+    codigo = "no_disponible"
+    status_http = 503
+    mensaje = "El servicio no esta disponible"
+
+
 class ErrorInesperado(ErrorDominio):
     """Fallo que no tiene semantica de negocio propia.
 
