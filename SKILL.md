@@ -47,8 +47,9 @@ sola direccion, y cada logica vive en un solo lugar.**
 12. [Errores frecuentes](#12-errores-frecuentes-aprendidos-a-la-fuerza)
 13. [Estrategia de pruebas](#13-estrategia-de-pruebas)
 14. [Checklist de verificacion](#14-checklist-de-verificacion)
-15. [Gate de readiness](#15-gate-de-readiness-el-backend-esta-listo-para-un-frontend)
-16. [Anadir una entidad nueva](#16-anadir-una-entidad-nueva)
+15. [Como se trabaja: la HU guia, el checklist verifica](#15-como-se-trabaja-la-hu-guia-el-checklist-verifica)
+16. [Gate de readiness](#16-gate-de-readiness-el-backend-esta-listo-para-un-frontend)
+17. [Anadir una entidad nueva](#17-anadir-una-entidad-nueva)
 
 ---
 
@@ -2371,7 +2372,94 @@ La version completa, con los gates de privacidad y de entrega, esta en
 
 ---
 
-## 15. Gate de readiness: el backend esta listo para un frontend?
+## 15. Como se trabaja: la HU guia, el checklist verifica
+
+> Esta seccion se lee **antes** de escribir codigo. Es la que evita las dos equivocaciones
+> mas comunes: implementar "el gate" sin saber que HU es, y cerrar una HU sin activar los
+> items del checklist que le tocan.
+
+### 15.1 La regla
+
+**Las HU guian.** Son la unidad de trabajo. Cada una describe un comportamiento del
+usuario, con su camino feliz, sus caminos de error y sus criterios de aceptacion. Se
+implementa **una HU**, no "un gate".
+
+**El checklist verifica.** Un gate **no se implementa**: es una condicion que el codigo
+tiene o no tiene. Se marca `[x]` cuando el codigo que lo sustenta existe y esta
+verificado, **con la evidencia al lado**.
+
+> Un gate no es una tarea. Es una propiedad que el codigo tiene o no tiene.
+
+### 15.2 El ciclo, en cuatro pasos
+
+```
+1. Elegir la HU siguiente (por el grafo de dependencias de docs/HU/INDICE.md)
+2. Implementar su comportamiento, con sus pruebas
+3. Verificar los items del checklist que esa HU toca  ->  marcar [x] con la evidencia
+4. La HU esta lista cuando sus criterios de aceptacion dan PASS
+```
+
+El paso 3 es el que conecta las dos cosas: **al cerrar una HU se activan sus items**. No
+al reves.
+
+**El criterio de "PR" de un item es concreto:** o hay una prueba que lo demuestra, o se
+puede señalar la linea de codigo o el comando que lo demuestra, o **no esta cumplido**.
+Un `[x]` sin evidencia es una promesa, y una promesa no cierra un gate.
+
+### 15.3 Que HU toca que gate
+
+El mapa esta en [`CHECKLIST.md`](CHECKLIST.md), seccion **"Gates por HU"**. Es el unico
+lugar donde se ve, para todas las HU, que items se activan al cerrar cada una.
+
+Antes de empezar una HU, mirar esa fila. Al terminar, marcar esos items.
+
+### 15.4 El nombre de la rama
+
+La rama es la unidad de entrega, y la **HU** es lo que se entrega. Por eso lleva el
+numero de la HU:
+
+```
+feat/hu-01-sesion
+feat/hu-06-carga-documento
+fix/hu-09-consulta-paginacion
+```
+
+| Que hace la rama | Nombre | Ejemplo |
+|---|---|---|
+| Cierra una HU | `feat/hu-<NN>-<que hace>` | `feat/hu-06-carga-documento` |
+| Cierra una HU y arregla algo | `fix/hu-<NN>-<que hace>` | `fix/hu-09-consulta-paginacion` |
+| Es un bloque que **no** es una HU | `feat/<bloque>-<que hace>` | `feat/migracion-esquema-rls` |
+| Solo documentacion | `docs/<que documenta>` | `docs/contrato-resultado` |
+
+El tercer caso existe porque hay trabajo que no cierra ninguna HU: la migracion, el
+esqueleto y los contratos son **bloques**, y se nombran por lo que hacen.
+
+> El numero de HU es lo que hace util la convencion: sin el, una rama dice que *area*
+> toca, pero no que **cierra**.
+
+### 15.5 Una rama por HU, no una por capa
+
+El backend y el frontend de una HU van **en la misma rama**, en el mismo pull request.
+
+La razon es el ciclo: una HU se cierra cuando sus criterios de aceptacion dan PASS y sus
+items del checklist quedan marcados con la evidencia. Con ramas separadas, la HU queda
+abierta dos pull requests y hay un estado intermedio en el que "la HU esta a medio hacer".
+
+### 15.6 Antes de abrir el pull request
+
+- [ ] La rama esta actualizada con `main`
+- [ ] La rama dice que HU cierra, y el PR lo repite en el titulo
+- [ ] Los **criterios de aceptacion** de la HU tienen prueba
+- [ ] Los **items del checklist** que esa HU toca estan marcados, con evidencia
+- [ ] El PR explica el **por que**, no solo el **que**
+- [ ] No hay secretos, ni `.env`, ni datos reales de cliente
+
+La guia completa de commits y pull requests esta en
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+---
+
+## 16. Gate de readiness: el backend esta listo para un frontend?
 
 Ejecutar antes de declarar la API consumible. Cada item debe verificarse contra un
 **servidor corriendo**, no un mock.
@@ -2417,7 +2505,7 @@ sobre una API a medias absorbe cada hueco como si fuera su propio error.
 
 ---
 
-## 16. Anadir una entidad nueva
+## 17. Anadir una entidad nueva
 
 1. **Escribe la migracion.** Incluye los campos de seguridad desde el dia uno
    (`creado_en`, `actualizado_en`, `eliminado_en`, `organizacion_id`).
@@ -2441,7 +2529,7 @@ sobre una API a medias absorbe cada hueco como si fuera su propio error.
 
 ---
 
-## 17. Referencia
+## 18. Referencia
 
 | Documento | Que contiene |
 |---|---|

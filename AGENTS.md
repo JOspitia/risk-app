@@ -62,6 +62,8 @@ Antes de escribir o modificar codigo:
 ### 1.4 Como se trabaja: las HU guian, el checklist verifica
 
 Es la pregunta que mas se repite al retomar el proyecto, asi que la respuesta va aqui.
+La version completa, con la convencion de ramas y el detalle de como cerrar un PR, esta
+en `SKILL.md` seccion 15.
 
 **Las HU guian.** Son la unidad de trabajo. Cada una describe un comportamiento del
 usuario, con su camino feliz, sus caminos de error y sus criterios de aceptacion. Se
@@ -84,6 +86,22 @@ El paso 3 es el que conecta las dos cosas: **al cerrar una HU se activan sus ite
 Por eso el Gate 2 no se "hace": se cierra a lo largo de seis HU (HU-01, HU-02, HU-03,
 HU-06, HU-07, HU-09). El mapeo item por item esta en `CHECKLIST.md`, seccion
 **"Gates por HU"**.
+
+### 1.5 Como se nombra una rama
+
+La rama lleva el numero de la HU, porque la rama es lo que se entrega y la HU es lo que
+se cierra:
+
+```
+feat/hu-01-sesion
+feat/hu-06-carga-documento
+```
+
+El trabajo que **no** cierra una HU (la migracion, el esqueleto, los contratos) se nombra
+por el bloque: `feat/migracion-esquema-rls`.
+
+Backend y frontend de una HU van **en la misma rama**: una HU se cierra de una vez, con
+sus criterios en PASS y sus items del checklist marcados.
 
 ---
 
