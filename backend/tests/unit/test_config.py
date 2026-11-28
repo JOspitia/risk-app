@@ -79,9 +79,7 @@ class TestUrlsDerivadas:
             supabase_anon_key="pub",
             supabase_service_role_key="srv",
         )
-        assert config.jwks_url == (
-            "https://ejemplo.supabase.co/auth/v1/.well-known/jwks.json"
-        )
+        assert config.jwks_url == ("https://ejemplo.supabase.co/auth/v1/.well-known/jwks.json")
 
     def test_el_jwks_explicito_manda(self) -> None:
         config = Config(
