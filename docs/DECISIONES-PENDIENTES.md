@@ -32,7 +32,7 @@ afectado.
 | DP-13 | Que pasa con los resultados cuando cambia la plantilla | Bajo | **Cerrada** — se guardan los documentos (ADR-20) |
 | DP-14 | Alta de usuarios desde la app | Medio | **Cerrada** — contrasena autogenerada por correo (ADR-18) |
 | DP-15 | Politica de retencion de los documentos archivados | Medio | **Cerrada** — supuesto por defecto (ADR-22) |
-| DP-16 | Que hace la sonda de salud cuando la base no responde | Medio | **Abierta** — el codigo y la arquitectura discrepan |
+| DP-16 | Que hacen las sondas de salud y de disponibilidad | Medio | **Cerrada** - dos sondas: supervivencia y disponibilidad |
 | DP-17 | Divergencias entre la HU-01 y otros documentos normativos | Bajo | **Cerrada** — manda el documento mas especifico |
 
 ---
@@ -348,38 +348,31 @@ una expiracion automatica es una tarea de mantenimiento mas, no un cambio de mod
 - ¿Hay documentos que no se pueden eliminar (por obligacion legal) y que exijan una
   retencion mayor?
 
-# Abiertas
+## DP-16 - Que hacen las sondas de salud y de disponibilidad - CERRADA
 
-## DP-16 - Que hace la sonda de salud cuando la base de datos no responde
+**Decision.** `[DECIDIDO]` **Dos sondas, no una.** `GET /health` es la **sonda de
+supervivencia**: mira el proceso y responde 200 siempre, sin tocar la base. `GET /ready`
+es la **sonda de disponibilidad**: consulta la vista publica `public.salud` y responde
+**Por que.** El `HEALTHCHECK` del contenedor (`backend/Dockerfile:114`) mira solo el codigo
+de salida. Si la sonda que el contenedor consulta dependiera de la base, un tropiezo de
+Supabase reiniciaria en bucle un contenedor de FastAPI que esta sano. Y al reves: una
+sonda que siempre responde 200 no distingue "todo bien" de "la base no esta", que es
+justo lo que el orquestador necesita para dejar de mandar trafico.
 
-**Decision.** `[ABIERTO]`
+Ninguna de las dos opciones servia sola. Por eso son dos.
 
-**Pregunta.** `docs/ARQUITECTURA.md` 8.1 marca como `[DECIDIDO]` que `GET /health`
-consulte la vista publica `public.salud` y responda **503** cuando Supabase no
-responde o el esquema no esta aplicado. El codigo hace otra cosa: responde 200
-siempre y no consulta la base. Y la vista `public.salud` **no existe en ninguna
-migracion** (001 a 012).
+**Como se refleja en el codigo.**
+- `backend/app/adapters/http/salud.py`: `/health` y `/ready`, las dos con el envelope.
+- `backend/app/application/use_cases/verificar_disponibilidad.py`: decide y levanta
+  `ServicioNoDisponibleError` (503). El caso de uso no conoce HTTP.
+- `backend/app/adapters/supabase/salud.py`: consulta la vista con la **llave publica**.
+  Con la de servicio, RLS no aplicaria y la sonda mentiria sobre lo que el servidor ve.
+- `supabase/migrations/013_vista_publica_de_salud.sql`: la vista, legible por `anon` y
+  por `authenticated`.
 
-**Por que importa.** El `HEALTHCHECK` del contenedor mira el codigo de salida, no el
-cuerpo (`backend/Dockerfile:114`). Con el comportamiento de la arquitectura, una base
-caida devuelve 503 y el orquestador reinicia el contenedor; con el actual, el
-contenidor sigue pareciendo sano mientras la API no puede servir. Las dos opciones
-tienen un coste: reinicios en cascada, o una sonda que no distingue "todo bien" de
-"la base no esta".
-
-**Que se asume mientras no se cierre.** La sonda **no** consulta la base y responde
-200 siempre. Es el comportamiento que ya esta desplegado y el que no reinicia
-procesos que funcionan. El item del Gate 9 que lo exige queda **sin marcar**, con
-esta anotacion como evidencia de por que no se cumple.
-
-**Que bloquea.** Nada de HU-01: la HU es de acceso y sesion, y el backend de
-autenticacion no depende de la sonda. Bloquea el cierre del Gate 9 y la vista
-`public.salud`, que haria falta crear en una migracion nueva.
-
-**Como se refleja en el codigo.** `backend/app/adapters/http/salud.py`. Lo que si se
-aplico en HU-01 es el envelope: sin el, el mismo endpoint devolvia una forma en
-exito y otra en error, y el Gate 5 exige una sola.
-
+**Lo que se corrigio de paso.** La vista `public.salud` que la arquitectura 8.1 nombraba
+no existia en ninguna migracion, y `GET /health` no la consultaba. Ahora existe, y la
+consulta `/ready`.
 ## DP-17 - Tres divergencias entre la HU-01 y otros documentos normativos - CERRADA
 
 **Decision.** `[DECIDIDO]` Cuando dos documentos del repo se contradicen, **manda el
@@ -402,8 +395,16 @@ Supabase firma con ES256 y publica su clave en el JWKS, asi que un
 `SUPABASE_JWT_SECRET` presente habria rechazado todos los tokens validos. El caso de
 la cuenta eliminada queda cubierto por la prueba que lo documenta.
 
-_Nota: la HU-01 sigue redactada con la version anterior de estas tres reglas. Es una
-correccion pendiente del documento, no del codigo._
+**La HU-01 se sincronizo.** Los tres puntos que quedaban con la redaccion anterior
+(CA-13, 5.4 y SP-07) se corrigieron para que el documento diga lo que el codigo hace.
+
+---
+
+# Abiertas
+
+_Ninguna abierta con impacto de arquitectura. Todas estan cerradas en la seccion de arriba.
+Las siguientes son preguntas de parametrizacion, no de diseno, y se responden con los datos
+del cliente cuando existan._
 
 ---
 
