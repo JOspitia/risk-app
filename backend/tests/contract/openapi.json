@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "CambioContrasenaResource": {
+        "description": "Confirmacion del cambio de credencial.\n\nLa contrasena **no viaja**: la credencial vive en Supabase Auth y el\nbackend ni la ve ni la verifica. Lo que sale es que la bandera\n`debe_cambiar_contrasena` quedo limpia.",
+        "properties": {
+          "confirmado": {
+            "title": "Confirmado",
+            "type": "boolean"
+          },
+          "usuario_id": {
+            "description": "Usuario cuya credencial quedo confirmada",
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuario_id",
+          "confirmado"
+        ],
+        "title": "CambioContrasenaResource",
+        "type": "object"
+      },
       "CierreSesionResource": {
         "description": "Confirmacion del cierre de sesion.",
         "properties": {
@@ -38,6 +59,33 @@
           "detalle"
         ],
         "title": "DetalleError",
+        "type": "object"
+      },
+      "DisponibilidadResource": {
+        "description": "Lo que el cliente ve de la disponibilidad del servicio.",
+        "properties": {
+          "estado": {
+            "description": "`ok` cuando el servicio puede recibir trafico",
+            "title": "Estado",
+            "type": "string"
+          },
+          "permisos_cargados": {
+            "description": "Permisos cargados en el esquema",
+            "title": "Permisos Cargados",
+            "type": "integer"
+          },
+          "roles_cargados": {
+            "description": "Roles cargados en el esquema",
+            "title": "Roles Cargados",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "estado",
+          "roles_cargados",
+          "permisos_cargados"
+        ],
+        "title": "DisponibilidadResource",
         "type": "object"
       },
       "PerfilResource": {
@@ -112,6 +160,53 @@
         "title": "PerfilResource",
         "type": "object"
       },
+      "Respuesta_CambioContrasenaResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CambioContrasenaResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[CambioContrasenaResource]",
+        "type": "object"
+      },
       "Respuesta_CierreSesionResource_": {
         "properties": {
           "data": {
@@ -157,6 +252,53 @@
           "timestamp"
         ],
         "title": "Respuesta[CierreSesionResource]",
+        "type": "object"
+      },
+      "Respuesta_DisponibilidadResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisponibilidadResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[DisponibilidadResource]",
         "type": "object"
       },
       "Respuesta_PerfilResource_": {
@@ -324,6 +466,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/cambiar-contrasena": {
+      "post": {
+        "description": "Confirma el cambio de credencial del usuario autenticado.\n\n**No cambia la contrasena.** La credencial vive en Supabase Auth (ADR-05):\nel frontend la cambia con `supabase.auth.updateUser` y despues llama a esta\nruta para confirmar. El backend no ve la contrasena, no la verifica y no la\nalmacena.\n\nLo que hace es limpiar `perfiles.debe_cambiar_contrasena` de la fila del\nusuario y dejar el hecho en la bitacora. Sin esa limpieza, la bandera\nseguiria mandando al usuario a cambiar la credencial en cada inicio de\nsesion, aunque ya la haya cambiado.\n\nNo necesita cuerpo: la fila que se modifica es la del token.",
+        "operationId": "cambiar_contrasena_api_v1_auth_cambiar_contrasena_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_CambioContrasenaResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cambiar Contrasena",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/logout": {
       "post": {
         "description": "Cierra la sesion del usuario autenticado.\n\nRevoca el `session_id` del token, de modo que el token deja de servir de\ninmediato, sin esperar su expiracion natural (ADR-31). No necesita cuerpo:\nla sesion que se revoca es la del token.",
@@ -407,6 +571,28 @@
           }
         },
         "summary": "Health Config",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "description": "La sonda de disponibilidad: dice si el servicio puede recibir trafico.\n\nA diferencia de `/health`, esta **mira la base**. Consulta la vista publica\n`public.salud` con la **llave publica**, nunca con la de servicio: con la de\nservicio, RLS no aplicaria y la sonda estaria mintiendo sobre lo que el\nservidor veria de verdad.\n\nResponde 200 con el envelope cuando la base responde y el esquema esta\naplicado, y 503 con el envelope cuando no. El 503 sale del error de dominio\n`ServicioNoDisponibleError`, no de una excepcion: el manejador global lo\ntraduce.\n\nNo pide autenticacion, igual que `/health`: es una sonda de la plataforma,\nno un endpoint de negocio. Lo que responde es el catalogo del sistema, no\ndatos de persona.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_DisponibilidadResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
         "tags": [
           "salud"
         ]
