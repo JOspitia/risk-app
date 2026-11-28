@@ -123,6 +123,9 @@ gestiona, solo la verifica.
 4. Un usuario sin `organizacion_id` asignado **puede** iniciar sesion, pero no puede operar
    sobre datos de organizacion: lo ve como un error de permisos, no como un fallo de
    autenticacion. `[PENDIENTE]` Confirmar con el cliente si conviene bloquearle antes.
+   La organizacion **efectiva** sale de `organizaciones_miembros`, con
+   `perfiles.organizacion_id` como respaldo (ADR-33): el aislamiento se resuelve desde la
+   membresia, no desde la columna del perfil.
 5. La sesion persiste en el navegador mediante el SDK de Supabase, que guarda el refresh
    token en `localStorage`. `[PENDIENTE]` Evaluar `httpOnly` con cookie si el cliente tiene
    una politica de seguridad estricta.
@@ -220,7 +223,7 @@ la administracion de usuarios (HU-03).
 | SP-04 | Token con firma adulterada | Igual que SP-02 | 401 |
 | SP-05 | Token expirado | El SDK lo refresca de forma transparente si tiene refresh token valido. Si no, la UI cierra la sesion | 401 |
 | SP-06 | Usuario desactivado en Supabase Auth | El login se rechaza | 401 |
-| SP-07 | Usuario autenticado **sin fila en `perfiles`** | Se responde `403` con el codigo `perfil_inexistente`. No 500, no 404 | 403 |
+| SP-07 | Usuario autenticado **sin fila en `perfiles`** | Se responde `403` con el codigo `perfil_inexistente`. No 500, no 404. Tambien es el caso de una **cuenta eliminada**: el backend no consulta `auth.users` (seccion 6), asi que no puede distinguirla de una que nunca tuvo perfil | 403 |
 | SP-08 | Usuario autenticado **sin `organizacion_id`** | Sesion iniciada. Las operaciones que requieren organizacion devuelven `403` | 403 |
 | SP-09 | Token de un proyecto de Supabase distinto | La firma no verifica | 401 |
 | SP-10 | El usuario tiene `debe_cambiar_contrasena = true` | La UI muestra el formulario de nueva contrasena **antes** de cualquier pantalla protegida | 200 (sesion valida) |
@@ -238,7 +241,7 @@ la administracion de usuarios (HU-03).
 | EC-03 | Refresh token expirado pero access token vigente | El access token sigue sirviendo hasta su expiracion. Despues, la UI cierra la sesion |
 | EC-04 | El reloj del navegador va adelantado | No afecta nada: el backend valida contra su propio reloj |
 | EC-05 | El usuario cierra la pestana a mitad de una peticion | La peticion se cancela. El backend no deja registros a medias: cada peticion es independiente |
-| EC-06 | Un usuario pertenece a dos organizaciones | `[PENDIENTE]` El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id`. Hay que decidir si el contexto lleva una o varias organizaciones |
+| EC-06 | Un usuario pertenece a dos organizaciones | `[PENDIENTE]` El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id`. Hay que decidir si el contexto lleva una o varias organizaciones. **Supuesto aplicado:** la organizacion efectiva es la primera membresia por orden de creacion (PP-01) |
 | EC-07 | `perfiles.rol` con un valor que no existe en la matriz | El backend lo rechaza al resolver permisos y responde `403`, no 500 |
 
 ### Casos "estupidos"
@@ -340,10 +343,11 @@ expiracion natural
 **Entonces** la UI le pide la nueva contrasena antes de mostrar cualquier pantalla protegida
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
-### CA-13: Arranque sin configuracion
+### CA-13: La llave de firma no es obligatoria
 **Dado** un entorno sin `SUPABASE_JWT_SECRET`
-**Cuando** la aplicacion arranca
-**Entonces** **falla de inmediato** con un error que nombra la variable faltante
+**Cuando** la aplicacion valida un token
+**Entonces** lo valida con el **JWKS del proyecto** (`ES256`). `SUPABASE_JWT_SECRET` es
+**opcional**: solo se usa si el token declara el algoritmo simetrico `HS256`
 &nbsp;&nbsp;&nbsp;&nbsp;PASS / FAIL
 
 ### CA-14: Dos sesiones simultaneas

@@ -214,14 +214,14 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 - [x] El arranque **falla** si falta `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
       `SUPABASE_SERVICE_ROLE_KEY` u otra variable obligatoria — comprobado: sin `.env`,
       `Config` lanza `ValidationError` nombrando las variables que faltan
-- [ ] La validacion del token usa el **JWKS del proyecto** (`{SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
+- [x] La validacion del token usa el **JWKS del proyecto** (`{SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
       no un secreto simetrico. `SUPABASE_JWT_SECRET` solo aplica a proyectos con claves
-      simetricas (HS256) y es opcional (ADR-31)
-- [ ] `service_role` no se usa para atender peticiones de usuario final
+      simetricas (HS256) y es opcional (ADR-31) -- el algoritmo lo decide la cabecera `alg` del token: HS256 usa el secreto, el resto el JWKS del proyecto (`adapters/http/middleware.py`)
+- [x] `service_role` no se usa para atender peticiones de usuario final -- revisado en todo `backend/app`: la llave de servicio solo aparece en `config.py` (definicion), `salud.py` (un booleano que no la filtra) y `scripts/bootstrap_admin.py` (administracion, ADR-13). La peticion de perfil propaga el JWT del usuario
 - [x] `service_role` nunca se expone al frontend ni viaja en el bundle — solo viajan
       variables `VITE_*` publicas
-- [ ] La validacion del token comprueba firma, `exp`, `aud` y emisor
-- [ ] Un token invalido, malformado o con firma adulterada devuelve 401, no 500
+- [x] La validacion del token comprueba firma, `exp`, `aud` y emisor -- `tests/unit/test_validacion_token.py`: firma, `exp`, `aud`, `iss` y `session_id`
+- [x] Un token invalido, malformado o con firma adulterada devuelve 401, no 500 -- `tests/unit/test_auth_http.py` y `tests/integration/test_sesion.py`: 401 en los tres casos
 - [ ] El cuerpo de ninguna respuesta contiene un hash de contrasena, un hash de token ni
       una columna interna
 - [ ] El rol del usuario se verifica en el caso de uso, no solo en el router
@@ -240,12 +240,12 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 
 - [x] `domain/` no importa nada de `adapters/`, `application/` ni de frameworks
       (verificable con `import-linter`) — `lint-imports`: 4 contratos, 0 rotos
-- [ ] Ningun router (adaptador de entrada) llama a un repositorio directamente
-- [ ] Ningun caso de uso construye schemas de HTTP ni conoce `Request`/`Response`
-- [ ] Ningun error de dominio se captura y se reenvuelve en un error generico
+- [x] Ningun router (adaptador de entrada) llama a un repositorio directamente -- el router solo llama a casos de uso, por `Depends`; el repositorio se construye en `deps.py`
+- [x] Ningun caso de uso construye schemas de HTTP ni conoce `Request`/`Response` -- los casos de uso devuelven DTOs; `Request` y `Response` solo aparecen en `adapters/http/`
+- [x] Ningun error de dominio se captura y se reenvuelve en un error generico -- `adapters/http/error_handlers.py` traduce `ErrorDominio` por su `status_http`; ninguna excepcion se reenvuelve
 - [x] Los puertos los define el dominio, no la infraestructura — `domain/ports/`, con
       `import-linter` verificando que el dominio no importa hacia afuera
-- [ ] Cada puerto declarado tiene al menos una implementacion en `adapters/`
+- [x] Cada puerto declarado tiene al menos una implementacion en `adapters/` -- `adapters/supabase/`: perfiles, sesiones, auditoria y salud
 - [x] No hay puertos para librerias de terceros que no van a cambiar — solo
       persistencia, motor LLM, almacenamiento, cola y reloj (ARQUITECTURA.md 2.4)
 
@@ -333,17 +333,17 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 
 ## Gate 5 — Errores y contrato
 
-- [ ] Cada error de dominio mapea al codigo de estado previsto (400/401/403/404/409/500)
-- [ ] Las violaciones de integridad se despachan por el codigo SQLState exacto, no por la
-      clase
-- [ ] El envelope es el mismo en exito y en error
-- [ ] El envelope de error trae un identificador legible por maquina, no solo prosa
-- [ ] Las marcas de tiempo se serializan en ISO-8601 (RFC 3339)
-- [ ] La ISO-8601 se verifica sobre el **cuerpo real** de la respuesta, no solo en la
-      configuracion
+- [x] Cada error de dominio mapea al codigo de estado previsto (400/401/403/404/409/500) -- `domain/errors.py`: 400, 401, 403, 404, 409, 500 y 503; `tests/unit/test_errores.py`
+- [x] Las violaciones de integridad se despachan por el codigo SQLState exacto, no por la
+      clase -- `adapters/supabase/cliente.py` traduce `42501` por el codigo, no por la clase de la excepcion
+- [x] El envelope es el mismo en exito y en error -- `adapters/http/responses.py`: `Respuesta.ok` y `Respuesta.error` construyen la misma forma; `tests/unit/test_envelope.py`
+- [x] El envelope de error trae un identificador legible por maquina, no solo prosa -- `errors[].codigo`: `no_autenticado`, `perfil_inexistente`, `sesion_no_revocable`
+- [x] Las marcas de tiempo se serializan en ISO-8601 (RFC 3339) -- `adapters/http/responses.py` las serializa en RFC 3339 con `Z`
+- [x] La ISO-8601 se verifica sobre el **cuerpo real** de la respuesta, no solo en la
+      configuracion -- `tests/integration/test_envelope.py` lo comprueba sobre el JSON que devuelve la API, no sobre la configuracion
 - [ ] `new Date(valor)` en JavaScript devuelve el anio correcto
-- [ ] Los booleanos son `true`/`false`, no `0`/`1` ni `"true"`
-- [ ] Los nulos son `null` explicito, no claves ausentes ni `"null"`
+- [x] Los booleanos son `true`/`false`, no `0`/`1` ni `"true"` -- el DTO del perfil expone `debe_cambiar_contrasena` como booleano
+- [x] Los nulos son `null` explicito, no claves ausentes ni `"null"` -- el envelope devuelve `data: null` y `errors: null`, nunca claves ausentes
 - [ ] La paginacion devuelve metadatos, no un array desnudo
 - [x] `page` por defecto 1, `size` por defecto 20, maximo 100, recortado y no rechazado —
       el caso de uso recorta el tamano en lugar de rechazar la peticion
@@ -377,24 +377,24 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 - [ ] La descarga del modelo pide aceptacion explicita y usa `navigator.storage.persist()`
 - [ ] El modelo se guarda en Cache API / IndexedDB, **no en cookies**
 - [ ] El ETL y el LLM corren en un Web Worker, sin bloquear la interfaz
-- [ ] El cliente HTTP centraliza el token: ningun `fetch` escribe el header a mano
-- [ ] Los tipos de la API se generan desde el OpenAPI; no hay `any`
+- [x] El cliente HTTP centraliza el token: ningun `fetch` escribe el header a mano -- `frontend/src/api/cliente.ts` es el unico que escribe el header `Authorization`; `frontend/src/api/cliente.spec.ts` lo comprueba
+- [x] Los tipos de la API se generan desde el OpenAPI; no hay `any` -- `npm run api:types` lee `backend/tests/contract/openapi.json`; el resultado es `frontend/src/api/types.ts`
 - [ ] El PDF nunca se serializa ni se envia en el camino principal
 
 ---
 
 ## Gate 8 — Pruebas
 
-- [ ] El dominio y los casos de uso tienen pruebas unitarias sin base de datos ni red
-- [ ] Las pruebas de integracion corren contra Supabase real (`supabase start`), no contra un
+- [x] El dominio y los casos de uso tienen pruebas unitarias sin base de datos ni red -- 116 pruebas en `backend/tests/unit/`, sin base de datos ni red
+- [x] Las pruebas de integracion corren contra Supabase real (`supabase start`), no contra un
       Postgres suelto: hacen falta Auth, PostgREST y Storage para que el aislamiento se
-      pruebe de verdad
+      pruebe de verdad -- 42 pruebas contra el stack local: Auth, PostgREST y RLS de verdad
 - [ ] Hay una prueba de ciclo de vida completo: crear -> leer -> actualizar -> borrar
-- [ ] Un intento de login en cuenta inactiva, bloqueada o eliminada es rechazado
-- [ ] Dos sesiones simultaneas funcionan ambas
-- [ ] Logout invalida el token de inmediato, sin esperar la expiracion
-- [ ] Un token revocado se rechaza en la peticion siguiente
-- [ ] Intentar revocar la sesion de otro usuario da 403 o 404
+- [x] Un intento de login en cuenta inactiva, bloqueada o eliminada es rechazado -- `tests/integration/test_sesion.py`
+- [x] Dos sesiones simultaneas funcionan ambas -- `tests/integration/test_sesion.py`
+- [x] Logout invalida el token de inmediato, sin esperar la expiracion -- `tests/integration/test_sesion.py`: la revocacion se comprueba en la peticion siguiente
+- [x] Un token revocado se rechaza en la peticion siguiente -- `tests/integration/test_sesion.py`
+- [x] Intentar revocar la sesion de otro usuario da 403 o 404 -- `tests/integration/test_revocacion.py`
 - [ ] La suite de inyeccion (SQLi, XSS, unicode, sobredimensionado, tipos erroneos) no
       produce 500 y no destruye datos
 - [ ] La asercion de limpieza es explicita: "no 500" no basta, la tabla debe seguir existiendo
@@ -410,13 +410,13 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 
 ## Gate 9 — Listo para el frontend
 
-- [ ] `GET /health` responde 200 e informa el estado de la base de datos
-- [ ] Todas las rutas estan documentadas con metodo, ruta, forma de peticion y de respuesta
-- [ ] El contrato OpenAPI es estable (snapshot en `tests/contract/`)
-- [ ] El login devuelve un token usable de inmediato
-- [ ] Las rutas protegidas rechazan token ausente, malformado y adulterado
+- [x] `/health` responde 200 sin consultar la base (sonda de supervivencia) y `/ready` informa del estado: 503 si Supabase no responde o el esquema no esta aplicado (sonda de disponibilidad). Decision en DP-16
+- [x] Todas las rutas estan documentadas con metodo, ruta, forma de peticion y de respuesta -- el OpenAPI se genera del codigo y el snapshot lo fija; cada ruta ademas lo explica en su docstring
+- [x] El contrato OpenAPI es estable (snapshot en `tests/contract/`) -- `tests/contract/test_openapi.py` falla cuando el contrato cambia
+- [x] El login devuelve un token usable de inmediato -- el SDK de Supabase emite el token y `GET /api/v1/auth/me` responde con el perfil en la misma sesion
+- [x] Las rutas protegidas rechazan token ausente, malformado y adulterado -- `tests/unit/test_auth_http.py`
 - [ ] El listado de documentos devuelve paginacion con metadatos
-- [ ] Los DTO de salida no exponen ningun campo sensible (inspeccion del cuerpo real)
+- [x] Los DTO de salida no exponen ningun campo sensible (inspeccion del cuerpo real) -- `tests/unit/test_auth_http.py` comprueba que ni el hash ni la llave de servicio aparecen en el cuerpo
 - [ ] El registro de un analisis devuelve 201/202 y el documento queda persistido
 - [ ] El estado del documento es consultable
 - [ ] `GET /trabajos/{id}` devuelve progreso, paso actual, duracion y actividades
@@ -440,8 +440,9 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
       publicas; el `.env` no se versiona
 - [ ] El codigo del adaptador de LLM no tiene ningun destino por defecto que sea una API de
       terceros
-- [x] El `service_role` no se usa para atender peticiones de usuario final — ADR-33: queda
-      confinado a `adapters/supabase/admin.py` y al script de bootstrap
+- [x] El `service_role` no se usa para atender peticiones de usuario final — ADR-33: por
+      ahora queda confinado a `scripts/bootstrap_admin.py`; el adaptador de
+      administracion de usuarios (`adapters/supabase/admin.py`) es de HU-03
 
 ## Gate 11 — Despliegue
 

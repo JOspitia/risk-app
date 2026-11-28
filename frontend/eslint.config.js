@@ -17,6 +17,17 @@ export default [
   ...tseslint.configs.recommended,
   ...pluginVue.configs['flat/recommended'],
   {
+    // Los archivos `.vue` llevan TypeScript en el `<script setup>`, y el parser de
+    // Vue no lo entiende: sin esto, cualquier `.vue` con anotaciones falla el
+    // analisis con un error de sintaxis.
+    files: ['**/*.vue'],
+    languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+      },
+    },
+  },
+  {
     languageOptions: {
       globals: {
         ...globals.browser,

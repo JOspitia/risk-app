@@ -1,0 +1,602 @@
+{
+  "components": {
+    "schemas": {
+      "CambioContrasenaResource": {
+        "description": "Confirmacion del cambio de credencial.\n\nLa contrasena **no viaja**: la credencial vive en Supabase Auth y el\nbackend ni la ve ni la verifica. Lo que sale es que la bandera\n`debe_cambiar_contrasena` quedo limpia.",
+        "properties": {
+          "confirmado": {
+            "title": "Confirmado",
+            "type": "boolean"
+          },
+          "usuario_id": {
+            "description": "Usuario cuya credencial quedo confirmada",
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuario_id",
+          "confirmado"
+        ],
+        "title": "CambioContrasenaResource",
+        "type": "object"
+      },
+      "CierreSesionResource": {
+        "description": "Confirmacion del cierre de sesion.",
+        "properties": {
+          "revocado": {
+            "title": "Revocado",
+            "type": "boolean"
+          },
+          "session_id": {
+            "description": "Sesion revocada",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "revocado"
+        ],
+        "title": "CierreSesionResource",
+        "type": "object"
+      },
+      "DetalleError": {
+        "description": "Un error de la respuesta.\n\n`codigo` es el identificador estable que el cliente decide con (por\nejemplo `no_autenticado`); `detalle` es la explicacion para una persona.",
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "detalle": {
+            "title": "Detalle",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "detalle"
+        ],
+        "title": "DetalleError",
+        "type": "object"
+      },
+      "DisponibilidadResource": {
+        "description": "Lo que el cliente ve de la disponibilidad del servicio.",
+        "properties": {
+          "estado": {
+            "description": "`ok` cuando el servicio puede recibir trafico",
+            "title": "Estado",
+            "type": "string"
+          },
+          "permisos_cargados": {
+            "description": "Permisos cargados en el esquema",
+            "title": "Permisos Cargados",
+            "type": "integer"
+          },
+          "roles_cargados": {
+            "description": "Roles cargados en el esquema",
+            "title": "Roles Cargados",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "estado",
+          "roles_cargados",
+          "permisos_cargados"
+        ],
+        "title": "DisponibilidadResource",
+        "type": "object"
+      },
+      "PerfilResource": {
+        "description": "Lo que el cliente ve del perfil.\n\nNo expone `auth.users`, ni el hash de la contrasena, ni el refresh token,\nni la llave de servicio. Solo lo que la HU-01 describe.",
+        "properties": {
+          "apellido_1": {
+            "title": "Apellido 1",
+            "type": "string"
+          },
+          "apellido_2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido 2"
+          },
+          "debe_cambiar_contrasena": {
+            "default": false,
+            "title": "Debe Cambiar Contrasena",
+            "type": "boolean"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "description": "Identificador del usuario",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "organizacion_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Organizacion efectiva del usuario. Nula si no pertenece a ninguna.",
+            "title": "Organizacion Id"
+          },
+          "rol": {
+            "description": "Rol efectivo del usuario",
+            "title": "Rol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombres",
+          "apellido_1",
+          "rol"
+        ],
+        "title": "PerfilResource",
+        "type": "object"
+      },
+      "Respuesta_CambioContrasenaResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CambioContrasenaResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[CambioContrasenaResource]",
+        "type": "object"
+      },
+      "Respuesta_CierreSesionResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CierreSesionResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[CierreSesionResource]",
+        "type": "object"
+      },
+      "Respuesta_DisponibilidadResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisponibilidadResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[DisponibilidadResource]",
+        "type": "object"
+      },
+      "Respuesta_PerfilResource_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerfilResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[PerfilResource]",
+        "type": "object"
+      },
+      "Respuesta_dict_str__Union_str__bool___": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[dict[str, Union[str, bool]]]",
+        "type": "object"
+      },
+      "Respuesta_dict_str__str__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[dict[str, str]]",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Analisis privado de documentos.",
+    "title": "Risk-app",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/auth/cambiar-contrasena": {
+      "post": {
+        "description": "Confirma el cambio de credencial del usuario autenticado.\n\n**No cambia la contrasena.** La credencial vive en Supabase Auth (ADR-05):\nel frontend la cambia con `supabase.auth.updateUser` y despues llama a esta\nruta para confirmar. El backend no ve la contrasena, no la verifica y no la\nalmacena.\n\nLo que hace es limpiar `perfiles.debe_cambiar_contrasena` de la fila del\nusuario y dejar el hecho en la bitacora. Sin esa limpieza, la bandera\nseguiria mandando al usuario a cambiar la credencial en cada inicio de\nsesion, aunque ya la haya cambiado.\n\nNo necesita cuerpo: la fila que se modifica es la del token.",
+        "operationId": "cambiar_contrasena_api_v1_auth_cambiar_contrasena_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_CambioContrasenaResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cambiar Contrasena",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Cierra la sesion del usuario autenticado.\n\nRevoca el `session_id` del token, de modo que el token deja de servir de\ninmediato, sin esperar su expiracion natural (ADR-31). No necesita cuerpo:\nla sesion que se revoca es la del token.",
+        "operationId": "cerrar_sesion_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_CierreSesionResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cerrar Sesion",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "El perfil del usuario autenticado.\n\nResponde 200 con el perfil dentro del envelope. Responde 401 si no hay\ncredencial valida y 403 con el codigo `perfil_inexistente` si el usuario\nesta autenticado pero no tiene perfil.",
+        "operationId": "mi_perfil_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_PerfilResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mi Perfil",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Comprueba que el proceso esta vivo.\n\nDevuelve `200` con un cuerpo minimo. Deliberadamente **no** comprueba la\nconexion con Supabase: un fallo de la base de datos es un problema de la base de\ndatos, y un `/health` que depende de ella reportaria caido el servicio entero y\nel orquestador reiniciaria procesos que funcionan.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_dict_str__str__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/health/config": {
+      "get": {
+        "description": "Comprueba que la configuracion se leyo y que los valores obligatorios\nexisten.\n\nNo devuelve ningun valor de configuracion: solo si estan presentes. Una ruta\nque devuelve la URL de Supabase o el emisor del JWT es una ruta que filtra\ninformacion de la infraestructura a cualquiera que la llame.",
+        "operationId": "health_config_health_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_dict_str__Union_str__bool___"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Config",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "description": "La sonda de disponibilidad: dice si el servicio puede recibir trafico.\n\nA diferencia de `/health`, esta **mira la base**. Consulta la vista publica\n`public.salud` con la **llave publica**, nunca con la de servicio: con la de\nservicio, RLS no aplicaria y la sonda estaria mintiendo sobre lo que el\nservidor veria de verdad.\n\nResponde 200 con el envelope cuando la base responde y el esquema esta\naplicado, y 503 con el envelope cuando no. El 503 sale del error de dominio\n`ServicioNoDisponibleError`, no de una excepcion: el manejador global lo\ntraduce.\n\nNo pide autenticacion, igual que `/health`: es una sonda de la plataforma,\nno un endpoint de negocio. Lo que responde es el catalogo del sistema, no\ndatos de persona.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Respuesta_DisponibilidadResource_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "salud"
+        ]
+      }
+    }
+  }
+}

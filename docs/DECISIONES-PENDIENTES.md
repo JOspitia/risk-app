@@ -32,6 +32,8 @@ afectado.
 | DP-13 | Que pasa con los resultados cuando cambia la plantilla | Bajo | **Cerrada** — se guardan los documentos (ADR-20) |
 | DP-14 | Alta de usuarios desde la app | Medio | **Cerrada** — contrasena autogenerada por correo (ADR-18) |
 | DP-15 | Politica de retencion de los documentos archivados | Medio | **Cerrada** — supuesto por defecto (ADR-22) |
+| DP-16 | Que hacen las sondas de salud y de disponibilidad | Medio | **Cerrada** - dos sondas: supervivencia y disponibilidad |
+| DP-17 | Divergencias entre la HU-01 y otros documentos normativos | Bajo | **Cerrada** — manda el documento mas especifico |
 
 ---
 
@@ -346,6 +348,58 @@ una expiracion automatica es una tarea de mantenimiento mas, no un cambio de mod
 - ¿Hay documentos que no se pueden eliminar (por obligacion legal) y que exijan una
   retencion mayor?
 
+## DP-16 - Que hacen las sondas de salud y de disponibilidad - CERRADA
+
+**Decision.** `[DECIDIDO]` **Dos sondas, no una.** `GET /health` es la **sonda de
+supervivencia**: mira el proceso y responde 200 siempre, sin tocar la base. `GET /ready`
+es la **sonda de disponibilidad**: consulta la vista publica `public.salud` y responde
+**Por que.** El `HEALTHCHECK` del contenedor (`backend/Dockerfile:114`) mira solo el codigo
+de salida. Si la sonda que el contenedor consulta dependiera de la base, un tropiezo de
+Supabase reiniciaria en bucle un contenedor de FastAPI que esta sano. Y al reves: una
+sonda que siempre responde 200 no distingue "todo bien" de "la base no esta", que es
+justo lo que el orquestador necesita para dejar de mandar trafico.
+
+Ninguna de las dos opciones servia sola. Por eso son dos.
+
+**Como se refleja en el codigo.**
+- `backend/app/adapters/http/salud.py`: `/health` y `/ready`, las dos con el envelope.
+- `backend/app/application/use_cases/verificar_disponibilidad.py`: decide y levanta
+  `ServicioNoDisponibleError` (503). El caso de uso no conoce HTTP.
+- `backend/app/adapters/supabase/salud.py`: consulta la vista con la **llave publica**.
+  Con la de servicio, RLS no aplicaria y la sonda mentiria sobre lo que el servidor ve.
+- `supabase/migrations/013_vista_publica_de_salud.sql`: la vista, legible por `anon` y
+  por `authenticated`.
+
+**Lo que se corrigio de paso.** La vista `public.salud` que la arquitectura 8.1 nombraba
+no existia en ninguna migracion, y `GET /health` no la consultaba. Ahora existe, y la
+consulta `/ready`.
+## DP-17 - Tres divergencias entre la HU-01 y otros documentos normativos - CERRADA
+
+**Decision.** `[DECIDIDO]` Cuando dos documentos del repo se contradicen, **manda el
+que es mas especifico sobre el tema**, no el que se escribio despues. Se resolvio
+cada caso asi, y se anota para que las contradicciones no se pierdan.
+
+**Por que.** Al implementar la HU-01 aparecieron tres contradicciones entre la HU,
+el `SKILL.md`, el `CHECKLIST.md` y los ADR. Ninguna era una decision nueva: las tres
+ya estaban tomadas en otra parte.
+
+| Caso | Contradiccion | Como se resolvio | Norma que manda |
+|---|---|---|---|
+| Llave de firma del token | HU-01 CA-13 da `SUPABASE_JWT_SECRET` por **obligatoria** | Se valida con el **JWKS del proyecto**; `SUPABASE_JWT_SECRET` solo se usa si el token declara HS256 | Gate 2 (`CHECKLIST.md`) y ADR-31 |
+| Organizacion efectiva | HU-01 5.4 la deja `[PENDIENTE]`; el esquema tiene dos fuentes | Sale de `organizaciones_miembros`, con `perfiles.organizacion_id` como respaldo | `001_esquema_inicial.sql:69` y ADR-33 |
+| Token de una cuenta eliminada | `SKILL.md` 13.4 pide 401; HU-01 SP-07 pide 403 `perfil_inexistente` | **403 `perfil_inexistente`** | HU-01 6 (el backend no consulta `auth.users`) |
+
+**Como se refleja en el codigo.** El validador decide el algoritmo por la cabecera
+`alg` del token, no por la presencia de una variable de entorno: el stack local de
+Supabase firma con ES256 y publica su clave en el JWKS, asi que un
+`SUPABASE_JWT_SECRET` presente habria rechazado todos los tokens validos. El caso de
+la cuenta eliminada queda cubierto por la prueba que lo documenta.
+
+**La HU-01 se sincronizo.** Los tres puntos que quedaban con la redaccion anterior
+(CA-13, 5.4 y SP-07) se corrigieron para que el documento diga lo que el codigo hace.
+
+---
+
 # Abiertas
 
 _Ninguna abierta con impacto de arquitectura. Todas estan cerradas en la seccion de arriba.
@@ -362,7 +416,7 @@ que son documentos de trabajo y no la fuente de verdad.
 
 | ID | Pendiente | Surge en | Impacto |
 |---|---|---|---|
-| PP-01 | Un usuario puede pertenecer a **varias organizaciones** con roles distintos. El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id` y el `AuditContext` no define como se elige la organizacion activa | HU-01 EC-06, HU-02 EC-02 | Medio. Afecta el modelo de contexto y el aislamiento |
+| PP-01 | Un usuario puede pertenecer a **varias organizaciones** con roles distintos. El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id` y el `AuditContext` no define como se elige la organizacion activa | HU-01 EC-06, HU-02 EC-02 | Medio. Afecta el modelo de contexto y el aislamiento. **Supuesto aplicado en HU-01:** la organizacion efectiva es la primera membresia por orden de creacion. Sigue abierta: el usuario puede cambiar de organizacion activa, y eso es una politica del cliente |
 | PP-02 | **Sesion en cookie `httpOnly`** en lugar de `localStorage` | HU-01 supuesto 5 | Bajo por ahora. Depende de la politica de seguridad del cliente |
 | PP-03 | **SSO corporativo** (SAML u OIDC) | HU-01 fuera de alcance 8 | Bajo. Se resuelve con Supabase si el cliente lo pide |
 | PP-04 | **Roles personalizados** creados por el administrador | HU-02 fuera de alcance 4 | Bajo. Se resuelve con una fila mas en `roles` |

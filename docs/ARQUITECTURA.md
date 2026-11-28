@@ -1601,7 +1601,8 @@ cada respuesta. Por eso el JSON se guarda con la referencia a la plantilla y la 
 
 | Metodo | Ruta | Descripcion | Auth |
 |---|---|---|---|
-| GET | `/health` | Sonda de vida y estado de la base | No |
+| GET | `/health` | Sonda de vida del proceso | No |
+| GET | `/ready` | Sonda de disponibilidad: base y esquema | No |
 | POST | `/api/v1/auth/logout` | Cierra la sesion y revoca el `session_id` de inmediato | Si |
 | POST | `/api/v1/auth/cambiar-contrasena` | Confirma el cambio de la credencial temporal y limpia la bandera | Si |
 | GET | `/api/v1/auth/me` | Usuario, rol, organizacion y permisos efectivos | Si |
@@ -1767,10 +1768,23 @@ frontend/.env.example
   VITE_API_BASE_URL=http://localhost:8000
 ```
 
-### 8.1 Que hace `GET /health`
+### 8.1 Que hacen `/health` y `/ready`
 
-`[DECIDIDO]` La sonda **no** dice "estoy vivo" sin mas. Consulta una vista publica que
-confirma que la base responde y que las migraciones estan aplicadas:
+`[DECIDIDO]` **Son dos sondas, y no se pueden fusionar.** Una sola ruta no puede
+cumplir las dos cosas: el `HEALTHCHECK` del contenedor y la disponibilidad del
+servicio piden criterios opuestos.
+
+| Sonda | Que mira | Que responde | Quien la consulta |
+|---|---|---|---|
+| `GET /health` | El proceso | 200 siempre | El `HEALTHCHECK` del contenedor, que solo mira el codigo de salida |
+| `GET /ready` | La base y el esquema | 200 o **503** | El orquestador, para dejar de mandar trafico |
+
+`/health` **no consulta la base**. Si lo hiciera, un tropiezo de Supabase haria que
+el orquestador reiniciara en bucle un contenedor de FastAPI que esta perfectamente
+sano.
+
+`/ready` **si** la consulta, con una vista publica que confirma que la base responde y
+que las migraciones estan aplicadas:
 
 ```sql
 -- Vista publica: no expone datos de negocio.
@@ -1780,12 +1794,13 @@ create or replace view public.salud as
     (select count(*) from public.permisos) as permisos_cargados;
 ```
 
-`GET /health` responde **200** si la consulta devuelve filas y los roles estan cargados, y
+`GET /ready` responde **200** si la consulta devuelve filas y los roles estan cargados, y
 **503** si Supabase no responde o el esquema no esta aplicado. Sin `service_role`: la
 vista es legible por todos y no contiene datos de usuario.
 
-Un healthcheck que siempre responde 200 no sirve para nada: no distingue "todo bien" de
-"la base no esta".
+Las dos responden con el envelope de la API. Un healthcheck que siempre responde 200 no
+sirve para nada: no distingue "todo bien" de "la base no esta". Pero uno que depende de
+la base es peor: reinicia procesos que funcionan.
 
 ---
 
