@@ -711,10 +711,14 @@ leer por PostgREST, con su propio JWT, los documentos de otros analistas de su e
 matriz de permisos se esquivaria por la puerta de atras.
 
 ```sql
--- Funcion estable: la organizacion activa del usuario en la peticion.
-create or replace function organizacion_activa()
+-- Las funciones de apoyo viven en el esquema `security` (ADR-35).
+-- `set row_security = off` es lo que evita la recursion: el propietario de la funcion
+-- lee los datos crudos, sin reevaluar la politica de la tabla que consulta.
+create or replace function security.organizacion_activa()
 returns uuid
-language sql stable
+language sql stable security definer
+set search_path = public, security
+set row_security = off
 as $$
   select m.organizacion_id
   from organizaciones_miembros m
@@ -725,25 +729,64 @@ as $$
   limit 1;
 $$;
 
+grant usage on schema security to authenticated;
+
 alter table documentos enable row level security;
 
 -- Lectura: lo propio, lo compartido, y lo de la organizacion si el permiso lo autoriza.
 create policy documentos_lectura on documentos
-  for select using (
+  for select to authenticated
+  using (
     eliminado_en is null
     and (
       usuario_id = auth.uid()
-      or exists (
-        select 1 from documentos_compartidos dc
-        where dc.documento_id = documentos.id and dc.usuario_id = auth.uid()
-      )
+      or security.documento_compartido_conmigo(documentos.id)
       or (
-        organizacion_id = organizacion_activa()
-        and public.usuario_tiene_permiso('analisis.ver_todos')
+        organizacion_id = security.organizacion_activa()
+        and security.usuario_tiene_permiso('analisis.ver_todos')
       )
     )
   );
 ```
+
+**Por que el esquema `security` y no funciones en `public`.** `[DECIDIDO]` Es la parte de
+esta seccion que mas costo encontrar, asi que queda explicada.
+
+Una politica de RLS que consulta otra tabla **dispara la politica de esa tabla**. Si esa
+politica vuelve a consultar la primera, Postgres detecta el ciclo y aborta. El caso
+concreto que aparecio al implementar esto:
+
+```
+documentos_lectura  ->  documentos_compartidos  ->  documentos_lectura
+```
+
+La primera version de las politicas definia las funciones de apoyo en `public`, y la
+politica de `perfiles` llamaba a `usuario_activo()`, que consultaba `perfiles`. El sintoma
+era `stack depth limit exceeded`, y el efecto real era peor que el error: **cuando una
+politica falla en error, la fila no se filtra**. El aislamiento quedaba anulado y la
+base parece funcionar: las migraciones se aplicaban, las consultas respondian, y cada
+usuario veia los documentos de los demas.
+
+Mover las funciones al esquema `security` **no resolvia el problema**: una funcion
+`security definer` sigue disparando las politicas de las tablas que consulta, porque
+`authenticated` no tiene `BYPASSRLS`. Con solo el cambio de esquema, el error cambio de
+forma a `infinite recursion detected in policy for relation "documentos"`.
+
+La solucion son las tres piezas juntas:
+
+1. Las funciones viven en el esquema `security`, que no tiene RLS.
+2. Son `security definer` **con `set row_security = off`**: el propietario de la funcion
+   (el rol que creo el esquema, con `BYPASSRLS`) lee las tablas sin que las politicas se
+   apliquen. Ahi no hay recursion, porque la politica no participa.
+3. `grant usage on schema security to authenticated`, sin lo cual las politicas fallan
+   con `permission denied for schema security` y el efecto es el mismo que en el punto
+   anterior: la fila no se filtra.
+
+Y hay una cuarta regla, que se aplico a todas las politicas: **ninguna politica consulta
+directamente una tabla que tenga RLS**. Cuando hace falta, la consulta va por una funcion
+de `security`. asi el ciclo no puede formarse.
+
+
 
 **Dos capas, y por que son distintas.** RLS filtra **filas**: que documentos existen y son
 visibles. El permiso filtra **acciones**: que se puede hacer con ellos. Las dos se
@@ -1803,6 +1846,7 @@ es un archivo nuevo, no un proyecto nuevo**.
 | ADR-32 | Las migraciones son SQL puro en `supabase/migrations/`, aplicadas con el CLI de Supabase | 2026-11-27 | Aceptada | Alembic y el CLI de Supabase sobre la misma base se pisan: `supabase db reset` ejecuta el SQL de `supabase/migrations/` y borra la tabla `alembic_version`, y Alembic no sabe desplegar hacia Supabase Cloud. Como el proyecto ya usa el CLI para el stack local, tener las dos herramientas es una fuente de verdad doble. Ademas el CLI es el unico que sabe aplicar las politicas de `storage.buckets` y `storage.objects`, que Alembic no gestiona |
 | ADR-33 | El aislamiento se resuelve desde `organizaciones_miembros`, y el esquema se completa con las tablas que las historias ya exigian | 2026-11-27 | Aceptada | `perfiles.organizacion_id` es un solo campo, pero un usuario puede pertenecer a varios equipos: una politica que se apoyara en el perfil le daria acceso a la otra organizacion. Y `organizaciones_miembros` no cubre el caso de un `analista` sin `analisis.ver_todos`, que por la puerta de PostgREST leeria los documentos de sus companeros: la matriz de permisos se esquivaba. El DDL, ademas, estaba desincronizado con las historias: faltaban la tabla de auditoria, la de compartidos, la de sesiones revocadas y varias columnas. Como el esquema todavia no existe en ninguna base, se corrige ahora |
 | ADR-34 | Editar una plantilla de extraccion crea una version nueva; la anterior se conserva | 2026-11-27 | Aceptada | Los analisis guardan la version de plantilla que usaron. Si la plantilla se modificara en el sitio, un analisis de hace tres meses quedaria explicando con reglas que ya no son las que se aplicaron, y no habria forma de reconstruir cual era. Versionar tambien permite volver a una version anterior. El precio es una tabla que crece, y una version activa unica garantizada con un indice parcial |
+| ADR-35 | Las funciones de apoyo de las politicas RLS viven en el esquema `security`, con `set row_security = off` | 2026-11-28 | Aceptada | Sin esto, las politicas se recursionan: la de `perfiles` llama a la que comprueba si el usuario esta activo, que a su vez consulta `perfiles`. Postgres aborta con `stack depth limit exceeded` y, cuando una politica falla en error, la fila **no** se filtra: el aislamiento queda anulado en silencio. Mover las funciones a otro esquema no basta, porque una `security definer` sigue disparando las politicas de las tablas que consulta (`authenticated` no tiene `BYPASSRLS`). `set row_security = off` hace que el propietario de la funcion lea los datos crudos, sin reevaluar la politica. Verificado el 2026-11-28 contra la base local |
 
 ### 10.1 Como se registra una decision nueva
 

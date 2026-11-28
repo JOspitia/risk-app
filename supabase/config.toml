@@ -21,9 +21,11 @@ enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
 
-[inbucket]
-enabled = true
-port = 54324
+# Correo de desarrollo. El CLI 3.4.0 renombro `[inbucket]` a `[local_smtp]`.
+# En desarrollo el correo se escribe en el log (o se abre en la bandeja local),
+# no se envia. El proveedor de correo real llega mas adelante.
+[local_smtp]
+port = 1025
 
 [storage]
 enabled = true

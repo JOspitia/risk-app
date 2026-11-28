@@ -125,8 +125,30 @@ Las migraciones son **SQL puro** en `supabase/migrations/` y las aplica el CLI d
 Supabase. No hay Alembic ni tabla `alembic_version` (ADR-32). El esquema nunca se
 edita a mano: cada cambio es una migracion nueva.
 
+Las que existen hoy:
+
+| Archivo | Que deja |
+|---|---|
+| `001_esquema_inicial.sql` | Las 16 tablas, sus indices y sus claves foraneas |
+| `002_rls.sql` | RLS activo en las 17 tablas, y las funciones de apoyo del esquema `security` (ADR-35) |
+| `003_permisos_y_roles.sql` | Los 3 roles, los 14 permisos y la matriz `rol_permisos` |
+| `004_bucket_y_storage.sql` | El bucket privado `documentos` y las politicas sobre `storage.objects` |
+| `005_funciones_rpc.sql` | Las funciones de atomicidad: `guardar_analisis`, `registrar_actividad`, `actualizar_trabajo`, `mis_permisos`, `revocar_sesion` |
+
+Ademas, `supabase/seed.sql` siembra la **plantilla generica v1** (plantilla del
+sistema, visible para todos). No siembra usuarios ni organizaciones: el primer
+administrador lo crea el script de bootstrap.
+
 > `supabase db reset` **borra** los datos de la base local. Es lo esperado: rehace
 > el esquema desde cero.
+
+> **El esquema `security`.** Las politicas de RLS no pueden consultarse entre si: la
+> de `documentos` llama a la de `documentos_compartidos`, que vuelve a consultar
+> `documentos`, y Postgres aborta con "infinite recursion detected". Por eso las
+> funciones de apoyo viven en el esquema `security` y leen con
+> `set row_security = off`. El detalle esta en `ARQUITECTURA.md` seccion 5.2 y en el
+> ADR-35. **Si anades una politica, no la escribas con un `exists` sobre otra tabla
+> que tenga RLS: usa una funcion de `security`.**
 
 Las variables del `.env` para la base local:
 
@@ -169,8 +191,37 @@ uv run python -m scripts.bootstrap_admin --correo admin@ejemplo.com --organizaci
 El script usa la llave de servicio: es el unico lugar del backend, junto al adaptador de
 administracion de usuarios, que puede usar `service_role`.
 
-> El script llega con el bloque de migracion, junto con `supabase/seed.sql`. En el
-> esqueleto todavia no existe.
+Lo que hace, en orden:
+
+1. Crea el usuario en Supabase Auth, con el correo ya confirmado.
+2. Registra el perfil con rol `admin` y `debe_cambiar_contrasena = true`.
+3. Crea la organizacion, o la reutiliza si ya existe con ese nombre.
+4. Registra la membresia: `organizaciones_miembros` con rol `admin`.
+
+El paso 4 es el que no se puede saltar. El aislamiento se resuelve desde las
+membresias (ADR-33): sin esa fila, el administrador no pertenece a ninguna
+organizacion y no ve nada.
+
+Es **idempotente**: si el correo ya existe, actualiza el usuario en vez de duplicarlo.
+Verificado el 2026-11-28 contra el stack local.
+
+> **Detalle de la API de administracion.** La API de Supabase **no** filtra usuarios
+> por correo: `GET /auth/v1/admin/users?filter=email.eq....` devuelve una lista
+> vacia aunque el usuario exista. El script lista las paginas y filtra en el cliente.
+> Es un detalle que no se adivina: sale de un `email_exists` en la segunda
+> ejecucion.
+
+Para fijar la contrasena a mano (por ejemplo, en una prueba automatizada):
+
+```bash
+uv run python -m scripts.bootstrap_admin \
+    --correo admin@ejemplo.com \
+    --organizacion "<nombre>" \
+    --contrasena "<clave>"
+```
+
+Sin `--contrasena`, se genera una contrasena temporal de 20 caracteres y se imprime
+al final de la ejecucion.
 
 ---
 
