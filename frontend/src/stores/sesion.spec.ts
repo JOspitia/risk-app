@@ -89,20 +89,22 @@ describe('store de sesion', () => {
       orden.push('sdk:updateUser')
       return { data: { user: null }, error: null }
     })
-    sdk.from.mockImplementation(() => ({
-      update: () => ({
-        eq: async () => {
-          orden.push('perfiles:actualizar')
-          return { error: null }
-        },
-      }),
-    }))
 
     vi.stubGlobal(
       'fetch',
       vi.fn(async (peticion: Request) => {
         peticiones.push(peticion)
         if (peticion.method === 'POST') {
+          if (peticion.url.includes('/cambiar-contrasena')) {
+            orden.push('http:cambiar-contrasena')
+            return respuesta({
+              success: true,
+              message: 'Credencial confirmada',
+              data: { usuario_id: 'usuario-1', confirmado: true },
+              errors: null,
+              timestamp: '2026-11-27T12:00:00Z',
+            })
+          }
           orden.push('http:logout')
           return respuesta({
             success: true,
@@ -235,14 +237,27 @@ describe('store de sesion', () => {
     expect(sesion.debeCambiarContrasena).toBe(true)
   })
 
-  it('cambiar la contrasena la cambia en el SDK y limpia la bandera', async () => {
+  it('cambiar la contrasena la cambia en el SDK y la confirma al backend', async () => {
     sdk.getSession.mockImplementation(async () => ({
       data: { session: sesionSupabase() },
       error: null,
     }))
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => respuesta(envelopePerfil(true))),
+      vi.fn(async (peticion: Request) => {
+        peticiones.push(peticion)
+        if (peticion.method === 'POST') {
+          orden.push('http:cambiar-contrasena')
+          return respuesta({
+            success: true,
+            message: 'Credencial confirmada',
+            data: { usuario_id: 'usuario-1', confirmado: true },
+            errors: null,
+            timestamp: '2026-11-27T12:00:00Z',
+          })
+        }
+        return respuesta(envelopePerfil(true))
+      }),
     )
     const sesion = useSesionStore()
     await sesion.restaurar()
@@ -251,7 +266,22 @@ describe('store de sesion', () => {
 
     expect(resultado.ok).toBe(true)
     expect(sdk.updateUser).toHaveBeenCalledWith({ password: 'la-clave-nueva' })
-    expect(orden).toContain('perfiles:actualizar')
+    expect(orden).toContain('http:cambiar-contrasena')
     expect(sesion.debeCambiarContrasena).toBe(false)
+  })
+
+  it('no escribe en la tabla de perfiles desde el navegador', async () => {
+    /*
+     * El frontend no toca `perfiles`: la confirma al backend.
+     *
+     * Escribir en la tabla de permisos desde el navegador es abrir la puerta a
+     * que alguien se cambie su propio rol: el backend es quien decide.
+     */
+    const sesion = useSesionStore()
+    await sesion.restaurar()
+
+    await sesion.cambiarContrasena('la-clave-nueva')
+
+    expect(sdk.from).not.toHaveBeenCalled()
   })
 })

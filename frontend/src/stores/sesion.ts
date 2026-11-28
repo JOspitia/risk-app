@@ -213,13 +213,13 @@ export const useSesionStore = defineStore('sesion', () => {
    * Cambia la credencial de la persona.
    *
    * La credencial vive en Supabase Auth (fuera del alcance del proyecto): el
-   * cambio se pide al SDK con `updateUser`. La bandera
-   * `perfiles.debe_cambiar_contrasena` se limpia en la fila del propio perfil,
-   * que es lo que la politica de actualizacion de `perfiles` permite.
+   * cambio se pide al SDK con `updateUser`. Despues se **confirma** al backend
+   * con `POST /api/v1/auth/cambiar-contrasena`, que es quien limpia la bandera
+   * `perfiles.debe_cambiar_contrasena` y deja el hecho en la bitacora.
    *
-   * El endpoint propio `POST /api/v1/auth/cambiar-contrasena` que aparece en
-   * `docs/ARQUITECTURA.md` todavia no existe en el backend: cuando exista,
-   * este es el unico punto que hay que cambiar.
+   * El frontend no escribe en `perfiles`: aunque la politica lo permitiera,
+   * escribir en la tabla de permisos desde el navegador es abrir la puerta a
+   * que alguien se cambie su propio rol.
    */
   async function cambiarContrasena(
     nueva: string,
@@ -232,17 +232,14 @@ export const useSesionStore = defineStore('sesion', () => {
       }
     }
 
-    const usuarioId = sesion.value?.user?.id ?? null
     let aviso: string | null = null
-    if (usuarioId !== null) {
-      const resultado = await supabase
-        .from('perfiles')
-        .update({ debe_cambiar_contrasena: false })
-        .eq('id', usuarioId)
-      if (resultado.error !== null) {
-        aviso =
-          'La contrasena se cambio, pero el servidor no pudo confirmar el cambio. Se volvera a pedir en el proximo inicio de sesion.'
-      }
+    const resultado = await cliente.POST('/api/v1/auth/cambiar-contrasena')
+    if (!resultado.response.ok) {
+      // La contrasena **ya** se cambio en Supabase: lo que no se pudo confirmar
+      // es la limpieza de la bandera. Se avisa en vez de callar, porque en el
+      // proximo inicio de sesion se volvera a pedir el cambio.
+      aviso =
+        'La contrasena se cambio, pero el servidor no pudo confirmar el cambio. Se volvera a pedir en el proximo inicio de sesion.'
     }
 
     if (perfil.value !== null) {

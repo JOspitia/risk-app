@@ -4,6 +4,38 @@
  */
 
 export interface paths {
+    "/api/v1/auth/cambiar-contrasena": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cambiar Contrasena
+         * @description Confirma el cambio de credencial del usuario autenticado.
+         *
+         *     **No cambia la contrasena.** La credencial vive en Supabase Auth (ADR-05):
+         *     el frontend la cambia con `supabase.auth.updateUser` y despues llama a esta
+         *     ruta para confirmar. El backend no ve la contrasena, no la verifica y no la
+         *     almacena.
+         *
+         *     Lo que hace es limpiar `perfiles.debe_cambiar_contrasena` de la fila del
+         *     usuario y dejar el hecho en la bitacora. Sin esa limpieza, la bandera
+         *     seguiria mandando al usuario a cambiar la credencial en cada inicio de
+         *     sesion, aunque ya la haya cambiado.
+         *
+         *     No necesita cuerpo: la fila que se modifica es la del token.
+         */
+        post: operations["cambiar_contrasena_api_v1_auth_cambiar_contrasena_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -102,10 +134,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description La sonda de disponibilidad: dice si el servicio puede recibir trafico.
+         *
+         *     A diferencia de `/health`, esta **mira la base**. Consulta la vista publica
+         *     `public.salud` con la **llave publica**, nunca con la de servicio: con la de
+         *     servicio, RLS no aplicaria y la sonda estaria mintiendo sobre lo que el
+         *     servidor veria de verdad.
+         *
+         *     Responde 200 con el envelope cuando la base responde y el esquema esta
+         *     aplicado, y 503 con el envelope cuando no. El 503 sale del error de dominio
+         *     `ServicioNoDisponibleError`, no de una excepcion: el manejador global lo
+         *     traduce.
+         *
+         *     No pide autenticacion, igual que `/health`: es una sonda de la plataforma,
+         *     no un endpoint de negocio. Lo que responde es el catalogo del sistema, no
+         *     datos de persona.
+         */
+        get: operations["ready_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * CambioContrasenaResource
+         * @description Confirmacion del cambio de credencial.
+         *
+         *     La contrasena **no viaja**: la credencial vive en Supabase Auth y el
+         *     backend ni la ve ni la verifica. Lo que sale es que la bandera
+         *     `debe_cambiar_contrasena` quedo limpia.
+         */
+        CambioContrasenaResource: {
+            /** Confirmado */
+            confirmado: boolean;
+            /**
+             * Usuario Id
+             * Format: uuid
+             * @description Usuario cuya credencial quedo confirmada
+             */
+            usuario_id: string;
+        };
         /**
          * CierreSesionResource
          * @description Confirmacion del cierre de sesion.
@@ -131,6 +215,27 @@ export interface components {
             codigo: string;
             /** Detalle */
             detalle: string;
+        };
+        /**
+         * DisponibilidadResource
+         * @description Lo que el cliente ve de la disponibilidad del servicio.
+         */
+        DisponibilidadResource: {
+            /**
+             * Estado
+             * @description `ok` cuando el servicio puede recibir trafico
+             */
+            estado: string;
+            /**
+             * Permisos Cargados
+             * @description Permisos cargados en el esquema
+             */
+            permisos_cargados: number;
+            /**
+             * Roles Cargados
+             * @description Roles cargados en el esquema
+             */
+            roles_cargados: number;
         };
         /**
          * PerfilResource
@@ -170,9 +275,33 @@ export interface components {
              */
             rol: string;
         };
+        /** Respuesta[CambioContrasenaResource] */
+        Respuesta_CambioContrasenaResource_: {
+            data?: components["schemas"]["CambioContrasenaResource"] | null;
+            /** Errors */
+            errors?: components["schemas"]["DetalleError"][] | null;
+            /** Message */
+            message: string;
+            /** Success */
+            success: boolean;
+            /** Timestamp */
+            timestamp: string;
+        };
         /** Respuesta[CierreSesionResource] */
         Respuesta_CierreSesionResource_: {
             data?: components["schemas"]["CierreSesionResource"] | null;
+            /** Errors */
+            errors?: components["schemas"]["DetalleError"][] | null;
+            /** Message */
+            message: string;
+            /** Success */
+            success: boolean;
+            /** Timestamp */
+            timestamp: string;
+        };
+        /** Respuesta[DisponibilidadResource] */
+        Respuesta_DisponibilidadResource_: {
+            data?: components["schemas"]["DisponibilidadResource"] | null;
             /** Errors */
             errors?: components["schemas"]["DetalleError"][] | null;
             /** Message */
@@ -233,6 +362,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    cambiar_contrasena_api_v1_auth_cambiar_contrasena_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Respuesta_CambioContrasenaResource_"];
+                };
+            };
+        };
+    };
     cerrar_sesion_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
@@ -309,6 +458,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Respuesta_dict_str__Union_str__bool___"];
+                };
+            };
+        };
+    };
+    ready_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Respuesta_DisponibilidadResource_"];
                 };
             };
         };
