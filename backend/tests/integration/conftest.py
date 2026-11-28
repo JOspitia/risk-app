@@ -212,6 +212,7 @@ def usuario_de_prueba(
         con_perfil: bool = True,
         con_membresia: bool = True,
         apellido_2: str | None = "Integracion",
+        rol: str = "analista",
     ) -> UsuarioDePrueba:
         correo = f"prueba-{uuid.uuid4().hex[:10]}@ejemplo.co"
         usuario_id = admin.crear_usuario(correo, CLAVE_DE_PRUEBA)
@@ -234,7 +235,7 @@ def usuario_de_prueba(
                     "apellido_2": apellido_2,
                     "display_name": f"{nombres} Prueba Integracion",
                     "correo": correo,
-                    "rol": "analista",
+                    "rol": rol,
                     "organizacion_id": organizacion_id,
                     "debe_cambiar_contrasena": False,
                     "activo": activo,
@@ -246,7 +247,7 @@ def usuario_de_prueba(
                 {
                     "organizacion_id": organizacion_id,
                     "usuario_id": usuario_id,
-                    "rol": "analista",
+                    "rol": rol,
                 },
             )
 
@@ -278,3 +279,29 @@ def cliente(config_local: Config) -> Iterator[TestClient]:
 def claims_de(token: str) -> dict[str, Any]:
     """Los claims de un token, sin verificar: solo para armar pruebas."""
     return dict(jwt.decode(token, options={"verify_signature": False}))
+
+
+def actualizar_perfil(
+    url: str,
+    llave_anonima: str,
+    token: str,
+    usuario_id: str,
+    cambios: dict[str, Any],
+) -> httpx.Response:
+    """Un `UPDATE` a `perfiles` hecho con el JWT del propio usuario.
+
+    Es la via que usa el frontend: PostgREST con el token del usuario, no con
+    la llave de servicio. Por eso decide la politica de RLS, y no el codigo de
+    Python.
+    """
+    return httpx.patch(
+        f"{url.rstrip('/')}/rest/v1/perfiles",
+        params={"id": f"eq.{usuario_id}"},
+        json=cambios,
+        headers={
+            "apikey": llave_anonima,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        timeout=30.0,
+    )
