@@ -32,6 +32,8 @@ afectado.
 | DP-13 | Que pasa con los resultados cuando cambia la plantilla | Bajo | **Cerrada** — se guardan los documentos (ADR-20) |
 | DP-14 | Alta de usuarios desde la app | Medio | **Cerrada** — contrasena autogenerada por correo (ADR-18) |
 | DP-15 | Politica de retencion de los documentos archivados | Medio | **Cerrada** — supuesto por defecto (ADR-22) |
+| DP-16 | Que hace la sonda de salud cuando la base no responde | Medio | **Abierta** — el codigo y la arquitectura discrepan |
+| DP-17 | Divergencias entre la HU-01 y otros documentos normativos | Bajo | **Cerrada** — manda el documento mas especifico |
 
 ---
 
@@ -348,9 +350,60 @@ una expiracion automatica es una tarea de mantenimiento mas, no un cambio de mod
 
 # Abiertas
 
-_Ninguna abierta con impacto de arquitectura. Todas estan cerradas en la seccion de arriba.
-Las siguientes son preguntas de parametrizacion, no de diseno, y se responden con los datos
-del cliente cuando existan._
+## DP-16 - Que hace la sonda de salud cuando la base de datos no responde
+
+**Decision.** `[ABIERTO]`
+
+**Pregunta.** `docs/ARQUITECTURA.md` 8.1 marca como `[DECIDIDO]` que `GET /health`
+consulte la vista publica `public.salud` y responda **503** cuando Supabase no
+responde o el esquema no esta aplicado. El codigo hace otra cosa: responde 200
+siempre y no consulta la base. Y la vista `public.salud` **no existe en ninguna
+migracion** (001 a 012).
+
+**Por que importa.** El `HEALTHCHECK` del contenedor mira el codigo de salida, no el
+cuerpo (`backend/Dockerfile:114`). Con el comportamiento de la arquitectura, una base
+caida devuelve 503 y el orquestador reinicia el contenedor; con el actual, el
+contenidor sigue pareciendo sano mientras la API no puede servir. Las dos opciones
+tienen un coste: reinicios en cascada, o una sonda que no distingue "todo bien" de
+"la base no esta".
+
+**Que se asume mientras no se cierre.** La sonda **no** consulta la base y responde
+200 siempre. Es el comportamiento que ya esta desplegado y el que no reinicia
+procesos que funcionan. El item del Gate 9 que lo exige queda **sin marcar**, con
+esta anotacion como evidencia de por que no se cumple.
+
+**Que bloquea.** Nada de HU-01: la HU es de acceso y sesion, y el backend de
+autenticacion no depende de la sonda. Bloquea el cierre del Gate 9 y la vista
+`public.salud`, que haria falta crear en una migracion nueva.
+
+**Como se refleja en el codigo.** `backend/app/adapters/http/salud.py`. Lo que si se
+aplico en HU-01 es el envelope: sin el, el mismo endpoint devolvia una forma en
+exito y otra en error, y el Gate 5 exige una sola.
+
+## DP-17 - Tres divergencias entre la HU-01 y otros documentos normativos - CERRADA
+
+**Decision.** `[DECIDIDO]` Cuando dos documentos del repo se contradicen, **manda el
+que es mas especifico sobre el tema**, no el que se escribio despues. Se resolvio
+cada caso asi, y se anota para que las contradicciones no se pierdan.
+
+**Por que.** Al implementar la HU-01 aparecieron tres contradicciones entre la HU,
+el `SKILL.md`, el `CHECKLIST.md` y los ADR. Ninguna era una decision nueva: las tres
+ya estaban tomadas en otra parte.
+
+| Caso | Contradiccion | Como se resolvio | Norma que manda |
+|---|---|---|---|
+| Llave de firma del token | HU-01 CA-13 da `SUPABASE_JWT_SECRET` por **obligatoria** | Se valida con el **JWKS del proyecto**; `SUPABASE_JWT_SECRET` solo se usa si el token declara HS256 | Gate 2 (`CHECKLIST.md`) y ADR-31 |
+| Organizacion efectiva | HU-01 5.4 la deja `[PENDIENTE]`; el esquema tiene dos fuentes | Sale de `organizaciones_miembros`, con `perfiles.organizacion_id` como respaldo | `001_esquema_inicial.sql:69` y ADR-33 |
+| Token de una cuenta eliminada | `SKILL.md` 13.4 pide 401; HU-01 SP-07 pide 403 `perfil_inexistente` | **403 `perfil_inexistente`** | HU-01 6 (el backend no consulta `auth.users`) |
+
+**Como se refleja en el codigo.** El validador decide el algoritmo por la cabecera
+`alg` del token, no por la presencia de una variable de entorno: el stack local de
+Supabase firma con ES256 y publica su clave en el JWKS, asi que un
+`SUPABASE_JWT_SECRET` presente habria rechazado todos los tokens validos. El caso de
+la cuenta eliminada queda cubierto por la prueba que lo documenta.
+
+_Nota: la HU-01 sigue redactada con la version anterior de estas tres reglas. Es una
+correccion pendiente del documento, no del codigo._
 
 ---
 
@@ -362,7 +415,7 @@ que son documentos de trabajo y no la fuente de verdad.
 
 | ID | Pendiente | Surge en | Impacto |
 |---|---|---|---|
-| PP-01 | Un usuario puede pertenecer a **varias organizaciones** con roles distintos. El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id` y el `AuditContext` no define como se elige la organizacion activa | HU-01 EC-06, HU-02 EC-02 | Medio. Afecta el modelo de contexto y el aislamiento |
+| PP-01 | Un usuario puede pertenecer a **varias organizaciones** con roles distintos. El modelo `organizaciones_miembros` lo permite, pero el `perfil` tiene un solo `organizacion_id` y el `AuditContext` no define como se elige la organizacion activa | HU-01 EC-06, HU-02 EC-02 | Medio. Afecta el modelo de contexto y el aislamiento. **Supuesto aplicado en HU-01:** la organizacion efectiva es la primera membresia por orden de creacion. Sigue abierta: el usuario puede cambiar de organizacion activa, y eso es una politica del cliente |
 | PP-02 | **Sesion en cookie `httpOnly`** en lugar de `localStorage` | HU-01 supuesto 5 | Bajo por ahora. Depende de la politica de seguridad del cliente |
 | PP-03 | **SSO corporativo** (SAML u OIDC) | HU-01 fuera de alcance 8 | Bajo. Se resuelve con Supabase si el cliente lo pide |
 | PP-04 | **Roles personalizados** creados por el administrador | HU-02 fuera de alcance 4 | Bajo. Se resuelve con una fila mas en `roles` |
