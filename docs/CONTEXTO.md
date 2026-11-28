@@ -6,7 +6,7 @@
 > [DECISIONES-PENDIENTES.md](DECISIONES-PENDIENTES.md).
 
 - **Estado:** vigente
-- **Ultima actualizacion:** 2026-11-27
+- **Ultima actualizacion:** 2026-11-28
 - **Origen:** consolidado de `docs/legacy/arquitectura-proyecto-analisis-documental.ORIGINAL.md`
 
 ---
@@ -20,6 +20,12 @@ Toda afirmacion relevante lleva una marca. No hay afirmaciones sin marcar en est
 | `[DECIDIDO]` | Cerrado. Se implementa asi. Cambiarlo exige un ADR en `ARQUITECTURA.md`. |
 | `[PROPUESTO]` | Recomendacion tecnica del equipo, pendiente de ratificacion por el usuario. |
 | `[ABIERTO]` | Sin definicion. Bloquea trabajo hasta cerrarse. |
+| `[PENDIENTE]` | Hay decision, pero falta un **dato** que solo tiene el cliente. No se rellena con un ejemplo plausible. |
+
+> `[PROPUESTO]` y `[PENDIENTE]` no son sinónimos. `[PROPUESTO]` es "esto es lo que
+> proponemos, falta que lo confirmes". `[PENDIENTE]` es "ya sabemos como se decide,
+> pero falta el dato: el nombre de los campos de riesgo, por ejemplo". Los cuatro
+> marcadores estan definidos igual que en `AGENTS.md` §1.2.
 
 ---
 
