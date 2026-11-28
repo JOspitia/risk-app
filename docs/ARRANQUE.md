@@ -178,13 +178,33 @@ administracion de usuarios, que puede usar `service_role`.
 
 El proyecto es incremental y cada capa se apoya en la anterior:
 
-1. **Esqueleto** (este documento): estructura, configuracion, dependencias.
-2. **Migracion**: esquema, RLS, matriz de permisos y bucket, contra una base vacia.
-3. **Contratos**: envelope, codigos de estado, paginacion y OpenAPI.
-4. **Adaptadores**: Supabase, almacenamiento, correo.
-5. **Casos de uso**: permisos, transacciones, auditoria.
-6. **Frontend**: sesion, documentos, motor, pipeline en el navegador.
-7. **Pruebas**: unitarias, de integracion contra Supabase real y de contrato.
+| # | Bloque | Estado | Gates que lo cubren |
+|---|---|---|---|
+| 1 | **Esqueleto**: estructura, configuracion, dependencias | **Hecho** | Gate 14 |
+| 2 | **Migracion**: esquema, RLS, matriz de permisos y bucket, contra una base vacia | Siguiente | Gate 1, 2, 3.1, 3.4 |
+| 3 | **Contratos**: envelope, codigos de estado, paginacion y OpenAPI | Pendiente | Gate 5, 9 |
+| 4 | **Adaptadores**: Supabase, almacenamiento, correo | Pendiente | Gate 3, 4 |
+| 5 | **Casos de uso**: permisos, transacciones, auditoria | Pendiente | Gate 3.1, 3.2, 4 |
+| 6 | **Frontend**: sesion, documentos, motor, pipeline en el navegador | Pendiente | Gate 7 |
+| 7 | **Pruebas**: unitarias, de integracion contra Supabase real y de contrato | En curso | Gate 8 |
+| 8 | **Fase 2**: ciclo de vida del riesgo, exportacion y correo | **Aplazada** | Gate 13 |
 
 El pipeline de la v1 corre **en el navegador**: el backend persiste resultados
 validados, no ejecuta el modelo (ADR-06).
+
+### Que es la fase 2
+
+La v1 entrega el **analisis**: extrae, consolida y persiste. La fase 2 es la que hace
+que el resultado **se gestione**: estado, responsable, fecha objetivo, decision de
+aceptacion e historial.
+
+Esta **aplazada**, no descartada, y el trabajo para que sea posible ya esta hecho: el
+contrato del resultado (`docs/CONTRATO-RESULTADO-ANALISIS.md`) fija la forma de cada
+riesgo con un envoltorio nuestro y un contenido de la plantilla. Lo que falta es la
+**decision del cliente** sobre si el resultado se gestiona o es solo una consulta
+(**PP-15**).
+
+Todo lo que esa fase necesita esta escrito en el **Gate 13** del `CHECKLIST.md`: el
+modelo de datos, las reglas de negocio, la integracion con lo ya construido, la
+exportacion y el correo. Las reglas de negocio de ahi salen del analisis del prototipo
+de referencia (`docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md`).
