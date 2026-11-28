@@ -83,6 +83,7 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 | Gate | Items | Cuando |
 |---|---|---|
 | Gate 0 | 5 de 5 | Documentacion leida y planificada |
+| Gate 1 | 10 de 11 | Esquema, RLS, permisos, bucket y funciones, aplicados y verificados. El item de `supabase db push` queda parcial: falta el proyecto en la nube |
 | Gate 14 | 15 de 15 | Esqueleto construido y verificado |
 | Gate 15 | 9 de 9 | Documentacion al dia |
 
@@ -93,9 +94,9 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 - [x] Se leieron `docs/CONTEXTO.md`, `docs/ARQUITECTURA.md` y `docs/DECISIONES-PENDIENTES.md`
       — los tres vigentes, leidos al escribir cada HU y cada ADR
 - [x] Los ADR aplicables a la iteracion estan identificados en la tabla de
-      `docs/ARQUITECTURA.md` seccion 10 — 34 ADR; cada commit referencia el suyo al pie
+      `docs/ARQUITECTURA.md` seccion 10 — 35 ADR; cada commit referencia el suyo al pie
 - [x] Las preguntas abiertas que tocan el alcance estan resueltas o el supuesto esta
-      anotado en el ADR — 15 DP cerradas; las 14 PP (PP-01 a PP-14) tienen supuesto explicito
+      anotado en el ADR — 15 DP cerradas; las 15 PP (PP-01 a PP-15) tienen supuesto explicito
 - [x] El alcance de la iteracion esta escrito en una frase — seccion 1 de cada HU, y el
       cuerpo de cada PR
 - [x] Los pasos 1 a 10 del "Quick start" de `SKILL.md` estan planeados — `SKILL.md`
@@ -105,19 +106,40 @@ criterio de cierre del gate es: **no queda ningun item sin marcar**.
 
 ## Gate 1 — Esquema y migraciones
 
-- [ ] Las migraciones se aplican limpiamente contra una base **vacia** (`supabase db reset`)
-- [ ] El historial muestra todas las versiones aplicadas con exito
-- [ ] **Una sola herramienta de migraciones**: SQL en `supabase/migrations/`. No hay Alembic
-      ni tabla `alembic_version` (ADR-32)
-- [ ] `supabase db push` aplica el mismo esquema en el proyecto de Supabase que el que se
-      valido en local
-- [ ] No hay auto-baseline activado fuera de adopcion de produccion
-- [ ] Ninguna migracion ya aplicada fue editada despues
-- [ ] Sin coma trailing antes del `)` de cierre de una definicion
-- [ ] Sin `now()` en el predicado de un indice parcial
-- [ ] Toda columna `uuid` de `auth.users` tiene su FK y su `on delete`
-- [ ] RLS activo en toda tabla con datos de usuario, verificado con un usuario real
-- [ ] Las columnas JSONB tienen indice GIN si se consultan por contenido
+- [x] Las migraciones se aplican limpiamente contra una base **vacia** (`supabase db reset`)
+      — verificado el 2026-11-28: `supabase db reset` aplica 001 a 005 + `seed.sql` sin error
+      en Supabase CLI 3.4.0 / PostgreSQL 17
+- [x] El historial muestra todas las versiones aplicadas con exito — `supabase_migrations.
+      schema_migrations` con las 5 filas: `001 esquema_inicial`, `002 rls`,
+      `003 permisos_y_roles`, `004 bucket_y_storage`, `005 funciones_rpc`
+- [x] **Una sola herramienta de migraciones**: SQL en `supabase/migrations/`. No hay Alembic
+      ni tabla `alembic_version` (ADR-32) — verificado: `supabase db reset` aplica el SQL
+      del directorio y no existe tabla `alembic_version`
+- [~] `supabase db push` aplica el mismo esquema en el proyecto de Supabase que el que se
+      valido en local — **pendiente de la cuenta**: falta crear el proyecto en Supabase y
+      tener `SUPABASE_URL` y las claves. El esquema es el mismo (mismo directorio), pero
+      no se ha ejecutado contra el proyecto real
+- [x] No hay auto-baseline activado fuera de adopcion de produccion — verificado: no hay
+      ninguna referencia a `alembic` ni a `pg_dump` versionado en el repositorio
+- [x] Ninguna migracion ya aplicada fue editada despues — verificado: el historial de
+      `schema_migrations` no registra cambios y el unico `db reset` fue contra la base
+      local de desarrollo
+- [x] Sin coma trailing antes del `)` de cierre de una definicion — verificado: las 5
+      migraciones se aplican sin error de sintaxis
+- [x] Sin `now()` en el predicado de un indice parcial — verificado: los indices parciales
+      usan `where estado = ...` y `where eliminado_en is null`, sin `now()`
+- [x] Toda columna `uuid` de `auth.users` tiene su FK y su `on delete` — verificado: 8
+      columnas `references auth.users(id)`, todas con `on delete cascade` o `on delete set null`
+- [x] RLS activo en toda tabla con datos de usuario, verificado con un usuario real —
+      verificado el 2026-11-28: `pg_class.relrowsecurity` es `true` en las 17 tablas de
+      `public`, y con dos usuarios reales en organizaciones distintas (Equipo Alfa y
+      Equipo Bravo) cada uno ve solo sus documentos, su organizacion y su perfil.
+      El anónimo ve 0 filas. El aislamiento por organizacion tambien se verifico con el
+      permiso `analisis.ver_todos` concedido y retirado en caliente (ADR-35)
+- [x] Las columnas JSONB tienen indice GIN si se consultan por contenido — verificado:
+      `bloques.datos_estructurados` tiene `bloques_riesgos_gin` (GIN); los demas JSONB
+      (`plantillas.esquema`, `analisis_documentos.riesgos`, `auditoria.detalles`) no se
+      consultan por contenido en la v1
 
 ---
 

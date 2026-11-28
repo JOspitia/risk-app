@@ -57,11 +57,12 @@ ejecuta en el navegador del usuario.
 | Metodo y contratos de codigo | Completo. `SKILL.md` |
 | Gates de verificacion | Completos. 19 gates en `CHECKLIST.md`, 44 items ya verificados |
 | **Esqueleto del proyecto** | **Listo.** Backend y frontend instalan, compilan y verifican |
+| **Migracion de base de datos** | **Lista.** Esquema, RLS, permisos, bucket y funciones RPC, aplicados contra una base **vacia** y verificados con usuarios reales |
 | Logica de negocio | **No existe todavia.** Sin endpoints, sin dominio, sin adaptadores |
-| Pendientes documentados | 14 (PP-01 a PP-14) |
+| Pendientes documentados | 15 (PP-01 a PP-15) |
 
-**La siguiente fase** es la migracion: esquema con RLS, matriz de permisos y bucket privado,
-aplicada contra una base **vacia**.
+**La siguiente fase** es HU-01 (acceso y sesion): es la unica HU que bloquea a todas
+las demas.
 
 ---
 
@@ -329,11 +330,18 @@ Y el criterio de severidad que conviene darle:
 
 ## 10. Lo que viene ahora
 
-1. **La migracion**: esquema con RLS, matriz de permisos y bucket privado, aplicada contra
-   una base **vacia** (no se acepta una migracion que nunca se ejecuto).
+1. **HU-01, acceso y sesion**: es la unica bloqueante de todas las demas.
 2. **Los contratos**: entidades, puertos, casos de uso, envelope, errores.
 3. **Los adaptadores**: Supabase (PostgREST), almacenamiento, correo.
 4. **Las pruebas**: traducidas de los criterios de aceptacion de cada HU.
+
+> La migracion ya esta hecha: `supabase/migrations/` tiene las cinco migraciones
+> (esquema, RLS, permisos, bucket y funciones RPC) y `supabase/seed.sql` siembra la
+> plantilla generica v1. Se aplicaron con `supabase db reset` contra una base vacia y
+> el aislamiento por organizacion se verifico con dos usuarios reales en equipos
+> distintos. El script `backend/scripts/bootstrap_admin.py` crea el primer
+> administrador. Falta ejecutar `supabase db push` contra el proyecto de Supabase en
+> la nube, que todavia no existe.
 
 El esqueleto ya existe y verifica: `backend/` y `frontend/` instalan, compilan y pasan
 `ruff`, `mypy`, `lint-imports`, `pytest`, `eslint`, `vue-tsc` y `vitest`. La guia de
