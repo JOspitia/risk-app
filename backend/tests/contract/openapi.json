@@ -205,6 +205,115 @@
         ],
         "title": "Respuesta[PerfilResource]",
         "type": "object"
+      },
+      "Respuesta_dict_str__Union_str__bool___": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[dict[str, Union[str, bool]]]",
+        "type": "object"
+      },
+      "Respuesta_dict_str__str__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DetalleError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "timestamp"
+        ],
+        "title": "Respuesta[dict[str, str]]",
+        "type": "object"
       }
     }
   },
@@ -268,11 +377,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Health Health Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Respuesta_dict_str__str__"
                 }
               }
             },
@@ -294,18 +399,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "boolean"
-                      }
-                    ]
-                  },
-                  "title": "Response Health Config Health Config Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Respuesta_dict_str__Union_str__bool___"
                 }
               }
             },

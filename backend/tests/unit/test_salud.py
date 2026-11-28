@@ -36,7 +36,18 @@ class TestHealth:
 
     def test_devuelve_el_estado_ok(self, cliente: TestClient) -> None:
         respuesta = cliente.get("/health")
-        assert respuesta.json() == {"estado": "ok"}
+        assert respuesta.json()["data"] == {"estado": "ok"}
+
+    def test_devuelve_el_envelope_de_la_api(self, cliente: TestClient) -> None:
+        """La sonda usa la misma forma que el resto de la API.
+
+        Un endpoint sin token tambien devuelve envelope: el cliente no tiene que
+        aprender una segunda forma de leer una respuesta.
+        """
+        cuerpo = cliente.get("/health").json()
+        assert set(cuerpo) == {"success", "message", "data", "errors", "timestamp"}
+        assert cuerpo["success"] is True
+        assert cuerpo["errors"] is None
 
     def test_no_pide_autenticacion(self, cliente: TestClient) -> None:
         """Sin token, y sin ninguna peticion de autenticacion que lo pida.
@@ -57,7 +68,7 @@ class TestHealthConfig:
         assert respuesta.status_code == 200
 
     def test_confirma_que_las_variables_obligatorias_estan(self, cliente: TestClient) -> None:
-        cuerpo = cliente.get("/health/config").json()
+        cuerpo = cliente.get("/health/config").json()["data"]
         assert cuerpo["supabase_url_configurada"] is True
         assert cuerpo["anon_key_configurada"] is True
         assert cuerpo["service_role_key_configurada"] is True
@@ -67,7 +78,7 @@ class TestHealthConfig:
 
         El cuerpo no puede contener la URL, ni la llave, ni el emisor del JWT.
         """
-        cuerpo = cliente.get("/health/config").json()
+        cuerpo = cliente.get("/health/config").json()["data"]
 
         config = obtener_config_de_prueba()
 
