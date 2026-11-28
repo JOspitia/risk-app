@@ -56,3 +56,10 @@ Thumbs.db
 docs/_build/
 docs/_site/
 docs/site/
+
+# Tooling de IA local.
+# `.atl/` es el registro de skills del agente: apunta a rutas absolutas de la
+# maquina que lo genera, asi que no es portable entre maquinas.
+# `.engram/config.json` SI se versiona: fija el nombre del proyecto para que
+# toda la memoria del repositorio caiga en el mismo bucket.
+.atl/
