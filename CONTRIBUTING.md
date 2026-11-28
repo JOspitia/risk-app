@@ -136,6 +136,48 @@ chore: excluye la documentacion generada del control de versiones
 **Regla:** `main` solo recibe cambios que pasaron el gate del `CHECKLIST.md`. El trabajo
 ocurre en una rama y llega a `main` por pull request.
 
+### 5.1 La rama dice que HU cierra
+
+La rama es la unidad de entrega, y la **HU** es lo que se entrega. Por eso la rama
+lleva el numero de la HU en el nombre:
+
+```
+feat/hu-01-sesion
+feat/hu-02-permisos
+feat/hu-06-carga-documento
+```
+
+Con esa convencion se responde de un vistazo: **que gates activa esta rama**. El
+mapa completo esta en `CHECKLIST.md`, seccion "Gates por HU".
+
+### 5.2 Como se nombra
+
+| Que hace la rama | Nombre | Ejemplo |
+|---|---|---|
+| Cierra una HU | `feat/hu-<NN>-<que hace>` | `feat/hu-06-carga-documento` |
+| Cierra una HU y ademas arregla algo | `fix/hu-<NN>-<que hace>` | `fix/hu-09-consulta-paginacion` |
+| Es un bloque que **no** es una HU | `feat/<bloque>-<que hace>` | `feat/migracion-esquema-rls` |
+| Solo documentacion | `docs/<que documenta>` | `docs/contrato-resultado` |
+
+El tercer caso existe porque hay trabajo que no cierra ninguna HU. La migracion, el
+esqueleto y los contratos son asi: son **bloques**, y se nombran por lo que hacen.
+
+> **El numero de HU es lo que hace util la convencion.** Sin el, una rama dice que
+> *area* toca (`cli-supabase-back`) pero no que **cierra**. Con el, el PR, la HU y los
+> items del checklist quedan enlazados.
+
+### 5.3 Una rama por HU, no una por capa
+
+El backend y el frontend de una HU van **en la misma rama**, en el mismo pull request.
+
+La razon es el ciclo de trabajo: una HU se cierra cuando sus criterios de aceptacion
+danan PASS, y sus items del checklist quedan marcados con la evidencia. Si el backend
+y el frontend van separados, la HU queda abierta dos pull requests y hay un estado
+intermedio en el que "la HU esta a medio hacer".
+
+Cada PR de una HU lleva, ademas, los items del checklist que esa HU activa, marcados
+con la evidencia de la verificacion.
+
 ---
 
 ## 6. Pull request
