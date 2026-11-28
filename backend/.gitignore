@@ -1,0 +1,22 @@
+# Entorno virtual de uv
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secretos: el `.env` nunca se versiona (ya esta en el `.gitignore` de la raiz)
+.env
+.env.*
+!.env.example
+
+# Configuracion local de Supabase
+supabase/.temp/

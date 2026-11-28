@@ -1,0 +1,146 @@
+[project]
+name = "risk-app-backend"
+version = "0.1.0"
+description = "API de Risk-app: analisis privado de documentos"
+readme = "../README.md"
+requires-python = ">=3.14,<3.15"
+
+# Versiones fijadas con pin exacto (ADR-27, ADR-28).
+# Un stack que se mueve solo es un stack que se rompe en silencio.
+dependencies = [
+    "fastapi[standard]==0.165.0",
+    "pydantic==2.14.4",
+    "pydantic-settings==2.16.3",
+    "httpx==0.28.1",
+    "supabase==2.34.1",
+    "PyJWT[crypto]==2.15.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.5.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.6",
+    "mypy==2.4.1",
+    "import-linter==2.17",
+    "types-pyjwt==1.7.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+# `app` es un paquete de la raiz del backend: sin esto, pytest no lo encuentra.
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "unit: pruebas de dominio y casos de uso, sin base de datos ni red",
+    "integration: pruebas contra Supabase real (requiere `supabase start`)",
+    "contract: pruebas del envelope y del snapshot de OpenAPI",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "W",    # warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "A",    # builtins shadowing
+    "C4",   # comprehensions
+    "DTZ",  # naive datetimes
+    "T20",  # prints
+    "SIM",  # simplificacion
+    "PTH",  # pathlib
+    "RUF",  # reglas propias de ruff
+]
+ignore = [
+    "B008",  # FastAPI usa llamadas en el valor por defecto de Depends
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "T20"]
+"app/adapters/http/**" = ["T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["app"]
+warn_unreachable = true
+disallow_any_explicit = false
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+# El dominio no conoce ningun framework ni ninguna capa exterior.
+[[tool.importlinter.contracts]]
+name = "El dominio no depende de nadie"
+type = "forbidden"
+source_modules = ["app.domain"]
+forbidden_modules = [
+    "app.application",
+    "app.adapters",
+    "app.worker",
+    "fastapi",
+    "pydantic",
+    "pydantic_settings",
+    "httpx",
+    "supabase",
+    "jwt",
+]
+
+# La aplicacion conoce el dominio y los puertos, no los adaptadores.
+[[tool.importlinter.contracts]]
+name = "La aplicacion no conoce los adaptadores"
+type = "forbidden"
+source_modules = ["app.application"]
+forbidden_modules = ["app.adapters", "fastapi"]
+
+# El dominio no importa la aplicacion: la dependencia apunta hacia adentro.
+[[tool.importlinter.contracts]]
+name = "El dominio no importa la aplicacion"
+type = "forbidden"
+source_modules = ["app.domain"]
+forbidden_modules = ["app.application"]
+
+# Los casos de uso no dependen de la infraestructura.
+[[tool.importlinter.contracts]]
+name = "Los casos de uso no dependen de los adaptadores"
+type = "forbidden"
+source_modules = ["app.application.use_cases"]
+forbidden_modules = ["app.adapters"]
