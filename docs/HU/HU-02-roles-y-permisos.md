@@ -232,7 +232,7 @@ async def ejecutar(self, cmd, ctx: AuditContext) -> list[Documento]:
         pagina=cmd.pagina,
         tamano=cmd.tamano,
     )
-    return [DocumentoDTO.from_model(d) for d in documentos]
+    return [DocumentoResource.from_model(d) for d in documentos]
 ```
 
 ### 7.3 Consultar el catalogo
