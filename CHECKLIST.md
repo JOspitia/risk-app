@@ -343,6 +343,97 @@ cambio de proveedor es un cambio de codigo en los casos de uso.**
 
 ---
 
+## Gate 13 — Ciclo de vida del riesgo (fase 2)
+
+> **Este gate no aplica en la v1.** La v1 entrega el analisis: extrae, consolida y
+> persiste. Este gate verifica la fase siguiente, en la que el resultado **se gestiona**.
+>
+> **Esta aplazado hasta que PP-15 se cierre.** La pregunta "el resultado tiene ciclo de
+> vida o es solo una consulta" es del cliente. Si la respuesta es "es solo una consulta",
+> este gate se elimina. Si es "se gestiona", se convierte en gates nuevos de permisos y
+> seguimiento.
+>
+> El material de este gate viene de dos fuentes:
+> - `docs/ANALISIS-REFERENCIA-VULNERABILITY-TRACKER.md` — el analisis del prototipo de
+>   referencia que mostro la forma que tiene un resultado cuando alguien lo gestiona.
+> - `docs/CONTRATO-RESULTADO-ANALISIS.md` — el contrato del resultado, ya definido.
+
+### 13.1 Modelo de datos
+
+- [ ] **PP-15 esta cerrada** y la respuesta esta escrita en `DECISIONES-PENDIENTES.md`
+- [ ] El modelo de datos del riesgo esta decidido: **columnas** en una tabla propia, o
+      **campos dentro del `jsonb` `riesgos`** con validacion
+- [ ] Si es tabla propia, existe **ADR** (cambia el modelo de datos) y la migracion esta
+      aplicada contra una base vacia
+- [ ] El riesgo tiene **estado**, con la lista de estados y las transiciones validas
+- [ ] El riesgo tiene **responsable**, y se sabe si es un correo o un usuario del sistema
+- [ ] El riesgo tiene **fecha objetivo**, y se sabe si es obligatoria
+- [ ] La **decision de aceptacion** tiene su tipo (aceptacion / excepcion) y su **fecha de
+      vencimiento**
+- [ ] El **historial** es append-only: se anota, no se edita ni se borra
+- [ ] El historial referencia el riesgo por su `clave` estable
+
+### 13.2 Reglas de negocio
+
+> Cada regla de aqui salio del prototipo de referencia. Copiadas sin entenderlas, fallan
+> en silencio.
+
+- [ ] **Una aceptacion vencida vuelve a requerir seguimiento.** "Aceptada" no es un estado
+      terminal: es una decision con fecha que hay que renovar
+- [ ] **Cerrar exige el comentario de validacion de cierre.** Sin el, "Cerrada" es un clic
+      sin consecuencias
+- [ ] **Aceptar exige tipo de decision *y* fecha de vencimiento.** Una aceptacion sin
+      fecha es eternal
+- [ ] **Un riesgo no puede quedar cerrado sin commentario**, y el backend lo rechaza
+- [ ] El **historial es de solo agregado**: no hay endpoint que edite una entrada
+- [ ] La transicion de estados se valida **en el caso de uso**, no solo en el formulario
+
+### 13.3 Contrato e integracion con lo ya construido
+
+- [ ] El **envoltorio del riesgo** del contrato se respeta: `clave`, `titulo`,
+      `descripcion`, `evidencia`, `confianza` siguen siendo los mismos
+- [ ] Los **campos de gestion** (estado, responsable, fecha, decision) se anaden **sin
+      romper** el contrato: van en `datos` o en campos propios, segun la decision del
+      punto 13.1
+- [ ] La `clave` permite **comparar riesgo por riesgo** entre dos analisis del mismo
+      documento (HU-10 7.6)
+- [ ] Un analisis ya guardado **no se invalida** por el cambio: si la forma se materializa
+      en columnas, hay migracion de los datos existentes
+- [ ] El backend valida el envoltorio **ademas** del contenido: clave unica, paginas de
+      evidencia dentro del documento y cubiertas por algun bloque, `confianza` de un valor
+      permitido
+
+### 13.4 Exportacion y respaldo
+
+> **Aplazado a la fase 2.** Exportar es una operacion de **salida de datos del sistema**,
+> y el resultado del analisis es el activo mas sensible del producto.
+
+- [ ] Existe **HU** para la exportacion: que se exporta, quien puede hacerlo, y si queda
+      registrado en la bitacora
+- [ ] La exportacion **no** incluye datos de otros usuarios ni de otras organizaciones
+- [ ] El CSV **escapa las formulas**: toda celda que empieza por `=`, `+`, `-`, `@`, tab o
+      CR lleva un apostrofo delante (la inyeccion de formulas en la hoja de calculo del
+      receptor)
+- [ ] La exportacion dice **que snapshot es**: el estado actual, no una fotografia
+      historica. El prototipo lo dice en la propia interfaz
+- [ ] El respaldo JSON se puede **restaurar** y la restauracion **valida** antes de
+      reemplazar los datos actuales
+
+### 13.5 Correo
+
+> **Aplazado a la fase 2.** La "fase de correos" del prototipo es el `mailto:` que se abre
+> al registrar un seguimiento.
+
+- [ ] Existe **HU** para el correo, con el alcance claro
+- [ ] El correo se envia por el **puerto de correo**, no por un `mailto:` del navegador
+- [ ] El cuerpo del correo **no** aparece en los logs
+- [ ] La implementacion de desarrollo escribe el correo en el log, para probar el flujo sin
+      contratar proveedor
+- [ ] El **dato** que dispara el correo (`responsable`) es un campo del riesgo, no una
+      direccion inventada por el sistema
+
+---
+
 ## Regla de la puerta
 
 > Si un item falla, el entregable no esta listo. Un frontend construido sobre una API a
