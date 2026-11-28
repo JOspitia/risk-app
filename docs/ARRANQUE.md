@@ -79,6 +79,17 @@ del panel de Supabase (`Project Settings -> API`), y la URL pasa a
 copiar el `.env` de la nube sobre el del stack local sin avisar. Son dos entornos
 distintos, con dos conjuntos de datos distintos.
 
+> **Nomenclatura.** Supabase renombro la `anon key` a **publishable key**. El panel
+> muestra `sb_publishable_...` y `sb_secret_...`. El proyecto las llama
+> `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` porque el SDK de Python las
+> nombra asi, y porque el nombre "anon" todavia aparece en la documentacion vieja.
+> `sb_publishable_` va en el frontend; `sb_secret_` **nunca**.
+
+> **Las dos llaves del stack local y las de la nube son distintas**, aunque el
+> nombre se parezca. El stack local genera las suyas al arrancar; la nube tiene las
+> suyas en el panel. Un `.env` con las de la nube apuntando a
+> `http://127.0.0.1:54321` no funciona, y al reves tampoco.
+
 > **La diferencia entre las dos llaves de la nube.** La `anon` (hoy `publishable`)
 > es la que viaja al navegador y la que aplica las politicas de RLS: el RLS es lo
 > que protege los datos. La `service_role` salta el RLS, asi que **nunca** va al
@@ -361,16 +372,47 @@ construcciones en dias distintos podrian instalar versiones distintas. El
 El proyecto en la nube es el que se usa para el despliegue. **El CLI de Supabase
 administra su propia configuracion**: no hay un `.env` para el, hay un enlace.
 
-### 7.1 Que hace falta
+### 7.1 Las cuatro cosas que hacen falta
 
-| Que | Donde sale |
+Son cuatro y se confunden entre si, asi que conviene separarlas:
+
+| Que | Donde sale | Para que |
+|---|---|---|
+| El **project ref** | `Project Settings -> General -> Reference ID`. Sale en la URL del panel | Identifica el proyecto |
+| La **publishable key** | `Project Settings -> API Keys` | La app en el navegador |
+| La **secret key** | `Project Settings -> API Keys` | El backend |
+| El **access token** | `Account Preferences -> Access Tokens` | **La CLI** |
+
+Las tres primeras son del **proyecto**. El access token es **de la cuenta**, y no
+tiene nada que ver con ellas: es lo que autoriza a la CLI a hablar con la
+plataforma.
+
+> **El access token no es la secret key.** Son cosas distintas, de sitios distintos
+> del panel, con propositos distintos. Confundirlas es el error mas comun al
+> enlistar un proyecto: la `secret key` la usa la aplicacion, el access token lo
+> usa la CLI.
+
+El **project ref** ya se ve en la URL del panel: `supabase.com/dashboard/project/<ref>/...`.
+
+### 7.1.1 El access token, y los permisos que pide
+
+El CLI 3.4.0 trabaja con **tokens con permisos** (`sbp_...`), no con el token de
+cuenta completo que usaba antes. Se genera en `Account Preferences -> Access
+Tokens`, y se puede limitar a lo que el proyecto necesita:
+
+| Comando | Permiso que pide |
 |---|---|
-| El **project ref** | El panel: `Project Settings -> General -> Reference ID`. Es el identificador del proyecto, del tipo `abcdefghijklmnopqrst` |
-| El **access token** | El panel: `Account Preferences -> Access Tokens`. Lo genera la plataforma |
-| La **contrasena de la base de datos** | El panel: `Project Settings -> Database -> Postgres` |
+| `supabase link` | `project_admin_read` (obligatorio), `projects_read`, `database_pooling_config_read` |
+| `supabase db push` | `database_write` (obligatorio), `projects_read` |
 
-El project ref es lo unico que el CLI necesita para **enlazar** el proyecto. El
-access token es lo que lo autoriza a hablar con la plataforma.
+El token de cuenta por defecto los trae todos. Un token "scoped" con esos
+permisos tambien sirve.
+
+### 7.1.2 La contrasena de la base de datos
+
+El `supabase db push` la pide, porque se conecta a Postgres para aplicar las
+migraciones. Si el proyecto todavia no tiene, se establece en
+`Project Settings -> Database -> Postgres`, y el panel la muestra una sola vez.
 
 ### 7.2 El enlace
 
