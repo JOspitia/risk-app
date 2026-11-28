@@ -11,9 +11,10 @@
 #   stacks de Supabase (este y el del CLI) significaria dos juegos de datos y dos
 #   juegos de llaves, y el error mas probable seria trabajar contra el equivocado.
 #   El compose se conecta al stack del CLI por el puerto publicado.
-# - **El frontend.** Se sirve con `npm run dev`, que recarga en caliente. Dentro de
-#   un contenedor el ciclo de recarga es mas lento y el inspector del navegador no
-#   llega al contenedor. El frontend es estatico y no necesita la imagen.
+# - **El frontend, por defecto.** Se sirve con `npm run dev`, que recarga en
+#   caliente y no necesita imagen. El compose lo tiene como perfiles aparte
+#   (`dev` y `prod`), para quien prefiera Validar dentro de Docker; ver los
+#   servicios `frontend-dev` y `frontend-prod` mas abajo.
 #
 # Uso:
 #
@@ -69,9 +70,75 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz}
+      # El emisor del token es la URL **publica** del proyecto, que no es la misma
+      # que la de conexion: aqui se conecta por `host.docker.internal`, pero el
+      # token lo emite el navegador contra `127.0.0.1`. Sin esto, todo token
+      # valido se rechaza por emisor.
+      SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:-http://127.0.0.1:54321/auth/v1}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     extra_hosts:
       # En Docker Desktop de Windows y macOS, `host.docker.internal` no siempre
       # viene definido. Esta linea lo garantiza en Linux tambien.
       - "host.docker.internal:host-gateway"
+
+  # ---------------------------------------------------------------------------
+  # El frontend, en Docker, con perfiles.
+  #
+  # Los dos usan el puerto 5173 del host, asi que **no pueden coexistir**: son
+  # perfiles, y se levanta uno u otro.
+  #
+  #     docker compose --profile dev  up -d     # Vite, con recarga en caliente
+  #     docker compose --profile prod up -d     # el bundle de produccion, con nginx
+  #
+  # El navegador del host es el que habla con Supabase y con la API: las
+  # variables apuntan a los puertos **publicados** del host, no a nombres de
+  # servicio de Docker. Por eso ninguno de los dos servicios depende del otro.
+  # ---------------------------------------------------------------------------
+
+  # El servidor de desarrollo de Vite, con recarga en caliente.
+  #
+  # El codigo se monta desde el host, pero `node_modules` **no**: es un volumen
+  # anonimo, que guarda las dependencias instaladas en la imagen y tapa las del
+  # host. Sin esa linea, el `node_modules` del host (Windows) monta encima del
+  # del contenedor (Linux) y Vite deja de funcionar.
+  frontend-dev:
+    profiles: ["dev"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: risk-app-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://127.0.0.1:54321}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # El bundle de produccion, servido por nginx.
+  #
+  # A diferencia del anterior, este no monta el codigo: la imagen lleva el
+  # bundle compilado dentro. Es exactamente lo que se despliega en Vercel, asi
+  # que es lo que hay que validar a mano antes de publicar.
+  #
+  # Las variables `VITE_` se hornean **al compilar**: si cambias una, hay que
+  # reconstruir la imagen (`docker compose --profile prod build --no-cache`).
+  frontend-prod:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://127.0.0.1:54321}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    container_name: risk-app-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "5173:80"

@@ -71,6 +71,31 @@ SUPABASE_ANON_KEY=sb_publishable_...        # la llave que imprime `supabase sta
 SUPABASE_SERVICE_ROLE_KEY=sb_secret_...      # la llave que imprime `supabase start`
 ```
 
+### `SUPABASE_JWT_ISSUER`: la URL de conexion y la URL publica no son lo mismo
+
+Supabase emite los tokens en `{URL_PUBLICA}/auth/v1`, y el backend comprueba que el
+token venga de ahi. **La URL publica del proyecto no siempre es la misma que la de
+conexion**, y en local con el backend en Docker no lo es:
+
+| | URL de conexion (`SUPABASE_URL`) | URL publica (lo que va en el token) |
+|---|---|---|
+| Backend en el host | `http://127.0.0.1:54321` | `http://127.0.0.1:54321` |
+| Backend en Docker | `http://host.docker.internal:54321` | `http://127.0.0.1:54321` |
+| En la nube | `https://<ref>.supabase.co` | `https://<ref>.supabase.co` |
+
+El token lo emite **el navegador**, y el navegador no conoce `host.docker.internal`.
+Si el backend espera el emisor de su propia URL de conexion, **todo token valido se
+rechaza** con `InvalidIssuerError` y el login falla con 401.
+
+Por eso el emisor se puede fijar aparte:
+
+```
+SUPABASE_JWT_ISSUER=http://127.0.0.1:54321/auth/v1
+```
+
+Si no se define, se deriva de `SUPABASE_URL`, que es lo correcto cuando ambas
+coinciden (la nube). El compose del backend lo define con el valor de arriba.
+
 Cuando se trabaja contra el **proyecto en la nube**, cambian las dos llaves por las
 del panel de Supabase (`Project Settings -> API`), y la URL pasa a
 `https://<project-ref>.supabase.co`.
@@ -125,6 +150,9 @@ npm run dev
 ```
 
 La aplicacion queda en `http://localhost:5173`.
+
+Tambien se puede levantar en Docker, con dos perfiles: `dev` (Vite, con recarga en
+caliente) y `prod` (el bundle de produccion, servido por nginx). Ver la seccion 6.2.
 
 ### Por que `--legacy-peer-deps`
 
@@ -297,6 +325,40 @@ uv run python -m scripts.bootstrap_admin \
 Sin `--contrasena`, se genera una contrasena temporal de 20 caracteres y se imprime
 al final de la ejecucion.
 
+### 7.2 Usuarios de prueba para validar a mano
+
+Para recorrer la aplicacion a mano hacen falta usuarios de cada rol. El script
+`backend/scripts/seed_usuarios.py` los siembra:
+
+```bash
+cd backend
+uv run python -m scripts.seed_usuarios
+uv run python -m scripts.seed_usuarios --contrasena "una-clave-fuerte"
+```
+
+Que crea:
+
+| Correo | Que es | Que pasa al entrar |
+|---|---|---|
+| `admin@ejemplo.co` | Rol `admin` | Ve todo lo de la organizacion |
+| `analista@ejemplo.co` | Rol `analista` | Ve lo del rol |
+| `auditor@ejemplo.co` | Rol `auditor` | Solo lectura |
+| `anonimo@ejemplo.co` | **Sin perfil** | La API responde `403` con el codigo `perfil_inexistente` |
+| `inactivo@ejemplo.co` | Perfil con `activo = false` | La API responde `403`: la cuenta esta desactivada |
+
+Los roles se **leen de la matriz** (`public.roles`), no estan escritos en el script:
+si la matriz cambia, el seeder siembra lo que haya.
+
+El "anonimo" es el caso de SP-07: entra en Supabase Auth, pero el backend no lo
+reconoce porque no tiene fila en `perfiles`. El "inactivo" es el otro camino de
+error: la cuenta existe, pero `activo = false` y el resolutor de permisos lo trata
+como sin permisos.
+
+Es **idempotente**: se puede volver a ejecutar y deja a los usuarios en el mismo
+estado, con la contrasena que se indique. Los usuarios se crean con la **API de
+administracion** de Supabase (`service_role`), nunca con un `insert` en
+`auth.users`: por la misma razon que `supabase/seed.sql` no trae usuarios.
+
 ---
 
 ## 6. Docker
@@ -335,8 +397,26 @@ docker inspect risk-app-backend --format '{{.State.Health.Status}}'
 ### 6.2 El entorno completo
 
 `docker compose up -d` levanta Supabase (Postgres, Auth, Storage, PostgREST) y el
-backend. **El frontend no se levanta en Docker**: se sirve con `npm run dev`, que
-reloja en caliente, y el inspector del navegador no llega al contenedor.
+backend. El frontend se sirve con `npm run dev`, que recarga en caliente.
+
+**El frontend tambien se puede levantar en Docker**, con dos perfiles que no
+coexisten (los dos ocupan el puerto 5173):
+
+```bash
+docker compose --profile dev up -d     # Vite, con recarga en caliente
+docker compose --profile prod up -d    # el bundle de produccion, servido por nginx
+```
+
+El perfil `prod` es el que conviene para validar antes de publicar: levanta
+**exactamente el bundle que se despliega en Vercel**, con las variables `VITE_`
+horneadas al compilar. El perfil `dev` es para trabajar dentro del contenedor.
+
+Las variables `VITE_` se leen **al compilar**, no al arrancar. Si cambias una, hay que
+reconstruir la imagen:
+
+```bash
+docker compose --profile prod build --no-cache
+```
 
 Lo que **no** hace el compose: aplicar migraciones. Se aplican con el CLI, que es
 la unica herramienta de migraciones del proyecto (ADR-32):

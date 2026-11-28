@@ -1,0 +1,16 @@
+# Lo que no entra en el contexto de la imagen.
+#
+# `node_modules` se reinstala dentro del contenedor: es lo que garantiza que la
+# imagen tenga las mismas dependencias que el lock, y no las que tenga el host.
+node_modules
+dist
+.env
+.env.*
+!.env.example
+coverage
+*.tsbuildinfo
+.vscode
+.idea
+Dockerfile
+.dockerignore
+README.md
