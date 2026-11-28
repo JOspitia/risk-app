@@ -32,3 +32,15 @@ class PerfilRepository(Protocol):
         `perfiles` (ADR-33).
         """
         ...
+
+    async def confirmar_cambio_de_contrasena(self, usuario_id: UUID) -> None:
+        """Confirma el cambio de credencial del usuario.
+
+        Limpia la bandera `debe_cambiar_contrasena` de la fila del usuario.
+        **No cambia la credencial**: esa vive en Supabase Auth (ADR-05) y no
+        entra al proyecto.
+
+        El metodo no dice a que fila escribe: es la del `usuario_id` que
+        recibe, y la base de datos no deja que sea otra.
+        """
+        ...

@@ -13,7 +13,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.application.dto.perfil import PerfilDTO
-from app.application.dto.sesion import CierreSesionDTO
+from app.application.dto.sesion import CambioContrasenaDTO, CierreSesionDTO
 
 
 class PerfilResource(BaseModel):
@@ -58,3 +58,19 @@ class CierreSesionResource(BaseModel):
     @classmethod
     def from_model(cls, cierre: CierreSesionDTO) -> CierreSesionResource:
         return cls(session_id=cierre.session_id, revocado=cierre.revocado)
+
+
+class CambioContrasenaResource(BaseModel):
+    """Confirmacion del cambio de credencial.
+
+    La contrasena **no viaja**: la credencial vive en Supabase Auth y el
+    backend ni la ve ni la verifica. Lo que sale es que la bandera
+    `debe_cambiar_contrasena` quedo limpia.
+    """
+
+    usuario_id: UUID = Field(description="Usuario cuya credencial quedo confirmada")
+    confirmado: bool
+
+    @classmethod
+    def from_model(cls, cambio: CambioContrasenaDTO) -> CambioContrasenaResource:
+        return cls(usuario_id=cambio.usuario_id, confirmado=cambio.confirmado)

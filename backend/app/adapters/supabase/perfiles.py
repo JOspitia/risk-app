@@ -15,8 +15,15 @@ from typing import Any
 from uuid import UUID
 
 from app.adapters.supabase.cliente import ClienteDatos
-from app.adapters.supabase.columnas import COLUMNAS_MEMBRESIA, COLUMNAS_PERFIL
+from app.adapters.supabase.columnas import (
+    COLUMNAS_CONFIRMACION_CONTRASENA,
+    COLUMNAS_MEMBRESIA,
+    COLUMNAS_PERFIL,
+)
 from app.domain.entities.perfil import Membresia, Perfil
+
+# La tabla del perfil del usuario.
+TABLA_PERFILES = "perfiles"
 
 
 class PerfilRepositorySupabase:
@@ -27,7 +34,7 @@ class PerfilRepositorySupabase:
 
     async def obtener(self, usuario_id: UUID) -> Perfil | None:
         filas = await self._cliente.seleccionar(
-            "perfiles",
+            TABLA_PERFILES,
             COLUMNAS_PERFIL,
             {"id": f"eq.{usuario_id}"},
             limite=1,
@@ -35,6 +42,20 @@ class PerfilRepositorySupabase:
         if not filas:
             return None
         return _mapear_perfil(filas[0])
+
+    async def confirmar_cambio_de_contrasena(self, usuario_id: UUID) -> None:
+        """Limpia la bandera `debe_cambiar_contrasena` de la fila del usuario.
+
+        El filtro va por `id` y la peticion lleva el JWT del usuario: la
+        politica de actualizacion de `perfiles` deja escribir **solo** en la
+        propia fila, y el trigger de la migracion 014 impide cambiar los
+        datos que dan poder.
+        """
+        await self._cliente.actualizar(
+            TABLA_PERFILES,
+            {"id": f"eq.{usuario_id}"},
+            {COLUMNAS_CONFIRMACION_CONTRASENA: False},
+        )
 
     async def membresia_actual(self, usuario_id: UUID) -> Membresia | None:
         """La pertenencia vigente: la primera por orden de creacion.

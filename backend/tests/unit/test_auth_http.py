@@ -279,6 +279,111 @@ class TestCierreDeSesion:
         assert cliente.post("/api/v1/auth/logout").status_code == 401
 
 
+class TestCambioDeContrasena:
+    """`POST /api/v1/auth/cambiar-contrasena`.
+
+    El endpoint **no cambia la contrasena**: la credencial vive en Supabase
+    Auth (ADR-05) y la cambia el frontend con `supabase.auth.updateUser`. Lo
+    que hace es limpiar `perfiles.debe_cambiar_contrasena` y registrar el
+    hecho.
+    """
+
+    def test_responde_200(
+        self,
+        cliente: TestClient,
+        token_de_prueba: Any,
+    ) -> None:
+        respuesta = cliente.post(
+            "/api/v1/auth/cambiar-contrasena",
+            headers={"Authorization": f"Bearer {token_de_prueba()}"},
+        )
+        assert respuesta.status_code == 200
+
+    def test_devuelve_el_envelope_de_la_api(
+        self,
+        cliente: TestClient,
+        token_de_prueba: Any,
+    ) -> None:
+        cuerpo = cliente.post(
+            "/api/v1/auth/cambiar-contrasena",
+            headers={"Authorization": f"Bearer {token_de_prueba()}"},
+        ).json()
+        assert set(cuerpo) == CAMPOS_DEL_ENVELOPE
+        assert cuerpo["success"] is True
+        assert cuerpo["errors"] is None
+        assert cuerpo["data"]["confirmado"] is True
+        assert cuerpo["data"]["usuario_id"] == "3ad2a179-04be-4023-86ff-9bfb0660adf7"
+
+    def test_limpia_la_bandera_de_la_fila_del_usuario(
+        self,
+        cliente: TestClient,
+        token_de_prueba: Any,
+        base_de_datos: BaseDeDatosFalsa,
+    ) -> None:
+        """La escritura va a la fila del propio usuario, no a otra."""
+        cliente.post(
+            "/api/v1/auth/cambiar-contrasena",
+            headers={"Authorization": f"Bearer {token_de_prueba()}"},
+        )
+        assert len(base_de_datos.cambios_de_perfil) == 1
+        cambio = base_de_datos.cambios_de_perfil[0]
+        assert cambio["cuerpo"] == {"debe_cambiar_contrasena": False}
+        assert cambio["filtros"] == {"id": "eq.3ad2a179-04be-4023-86ff-9bfb0660adf7"}
+
+    def test_registra_el_evento_en_la_bitacora(
+        self,
+        cliente: TestClient,
+        token_de_prueba: Any,
+        base_de_datos: BaseDeDatosFalsa,
+    ) -> None:
+        cliente.post(
+            "/api/v1/auth/cambiar-contrasena",
+            headers={"Authorization": f"Bearer {token_de_prueba()}"},
+        )
+        assert len(base_de_datos.auditoria) == 1
+        assert base_de_datos.auditoria[0]["accion"] == "perfil.contrasena_confirmada"
+        assert base_de_datos.auditoria[0]["usuario_id"] == (
+            "3ad2a179-04be-4023-86ff-9bfb0660adf7"
+        )
+
+    def test_el_endpoint_no_pide_cuerpo(self, cliente: TestClient) -> None:
+        """La contrasena nueva no viaja al backend.
+
+        La credencial vive en Supabase Auth (ADR-05): el frontend la cambia con
+        `updateUser` y despues confirma aqui. Si el endpoint admitiera un
+        cuerpo, alguien podria mandar la contrasena nueva por la API.
+        """
+        operacion = cliente.get("/openapi.json").json()["paths"][
+            "/api/v1/auth/cambiar-contrasena"
+        ]["post"]
+        assert "requestBody" not in operacion
+
+    def test_sin_token_responde_401(self, cliente: TestClient) -> None:
+        assert cliente.post("/api/v1/auth/cambiar-contrasena").status_code == 401
+
+    def test_con_token_invalido_responde_401(self, cliente: TestClient) -> None:
+        respuesta = cliente.post(
+            "/api/v1/auth/cambiar-contrasena",
+            headers={"Authorization": "Bearer no-es-un-jwt"},
+        )
+        assert respuesta.status_code == 401
+
+    def test_sin_perfil_responde_403(
+        self,
+        cliente: TestClient,
+        token_de_prueba: Any,
+        base_de_datos: BaseDeDatosFalsa,
+    ) -> None:
+        """SP-07: sin fila en `perfiles` no hay bandera que limpiar."""
+        base_de_datos.perfil = None
+        respuesta = cliente.post(
+            "/api/v1/auth/cambiar-contrasena",
+            headers={"Authorization": f"Bearer {token_de_prueba()}"},
+        )
+        assert respuesta.status_code == 403
+        assert respuesta.json()["errors"][0]["codigo"] == "perfil_inexistente"
+
+
 class TestNoHayLogin:
     """CA-03: el backend no emite tokens."""
 

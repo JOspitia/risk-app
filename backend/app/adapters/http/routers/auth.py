@@ -16,15 +16,22 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.adapters.http.deps import (
+    caso_cambiar_contrasena,
     caso_cerrar_sesion,
+    contexto_de_cambio,
     contexto_de_cierre,
     requiere_autenticado,
     requiere_perfil,
 )
 from app.adapters.http.responses import Respuesta
-from app.adapters.http.schemas.auth import CierreSesionResource, PerfilResource
+from app.adapters.http.schemas.auth import (
+    CambioContrasenaResource,
+    CierreSesionResource,
+    PerfilResource,
+)
 from app.application.audit.contexto import AuditContext
 from app.application.dto.perfil import PerfilDTO
+from app.application.use_cases.cambiar_contrasena import CambiarContrasena
 from app.application.use_cases.cerrar_sesion import CerrarSesion
 from app.domain.entities.credencial import CredencialSesion
 
@@ -63,4 +70,32 @@ async def cerrar_sesion(
     return Respuesta.ok(
         data=CierreSesionResource.from_model(resultado),
         mensaje="Sesion cerrada",
+    )
+
+
+@router.post("/cambiar-contrasena", response_model=Respuesta[CambioContrasenaResource])
+async def cambiar_contrasena(
+    perfil: PerfilDTO = Depends(requiere_perfil),
+    credencial: CredencialSesion = Depends(requiere_autenticado),
+    ctx: AuditContext = Depends(contexto_de_cambio),
+    caso: CambiarContrasena = Depends(caso_cambiar_contrasena),
+) -> Respuesta[CambioContrasenaResource]:
+    """Confirma el cambio de credencial del usuario autenticado.
+
+    **No cambia la contrasena.** La credencial vive en Supabase Auth (ADR-05):
+    el frontend la cambia con `supabase.auth.updateUser` y despues llama a esta
+    ruta para confirmar. El backend no ve la contrasena, no la verifica y no la
+    almacena.
+
+    Lo que hace es limpiar `perfiles.debe_cambiar_contrasena` de la fila del
+    usuario y dejar el hecho en la bitacora. Sin esa limpieza, la bandera
+    seguiria mandando al usuario a cambiar la credencial en cada inicio de
+    sesion, aunque ya la haya cambiado.
+
+    No necesita cuerpo: la fila que se modifica es la del token.
+    """
+    resultado = await caso.ejecutar(credencial, ctx)
+    return Respuesta.ok(
+        data=CambioContrasenaResource.from_model(resultado),
+        mensaje="Credencial confirmada",
     )

@@ -21,9 +21,14 @@ from fastapi import Request
 
 from app.adapters.supabase.auditoria import AuditoriaRepositorySupabase
 from app.adapters.supabase.cliente import ClienteDatos
+from app.adapters.supabase.perfiles import PerfilRepositorySupabase
 from app.adapters.supabase.sesiones import SesionRevocadaRepositorySupabase
 from app.application.audit.contexto import AuditContext
 from app.application.dto.perfil import PerfilDTO
+from app.application.use_cases.cambiar_contrasena import (
+    ACCION_CAMBIO_CONTRASENA,
+    CambiarContrasena,
+)
 from app.application.use_cases.cerrar_sesion import ACCION_CIERRE_SESION, CerrarSesion
 from app.domain.entities.credencial import CredencialSesion
 from app.domain.errors import NoAutenticadoError, PerfilInexistenteError
@@ -80,3 +85,17 @@ def caso_cerrar_sesion(request: Request) -> CerrarSesion:
 def contexto_de_cierre(request: Request) -> AuditContext:
     """El contexto de auditoria con la accion del cierre de sesion."""
     return replace(contexto_auditoria(request), accion=ACCION_CIERRE_SESION)
+
+
+def caso_cambiar_contrasena(request: Request) -> CambiarContrasena:
+    """El caso de uso de confirmacion del cambio de credencial."""
+    cliente = cliente_datos(request)
+    return CambiarContrasena(
+        perfiles=PerfilRepositorySupabase(cliente),
+        auditoria=AuditoriaRepositorySupabase(cliente),
+    )
+
+
+def contexto_de_cambio(request: Request) -> AuditContext:
+    """El contexto de auditoria con la accion del cambio de credencial."""
+    return replace(contexto_auditoria(request), accion=ACCION_CAMBIO_CONTRASENA)
