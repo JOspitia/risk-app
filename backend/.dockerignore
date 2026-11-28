@@ -1,0 +1,41 @@
+# Contexto de build del backend.
+#
+# Sin esto, `docker build` envia el directorio entero: el `.venv` (cientos de
+# megabytes), el `.env` con las llaves y el historial de pruebas. La imagen no lo
+# necesita, y el `.env` no deberia viajar ni siquiera dentro del contexto.
+
+# Secretos y configuracion local
+.env
+.env.*
+!.env.example
+
+# Entornos y dependencias ya instaladas: la imagen las construye ella
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.import_linter_cache/
+
+# Herramientas
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Documentacion y pruebas: no hacen falta para servir la API
+docs/
+tests/
+README.md
+*.md
+
+# El codigo de migraciones lo monta el host, no se copia en la imagen
+migrations/
+supabase/
+
+# Configuracion de despliegue
+vercel.json
+.dockerignore
+Dockerfile

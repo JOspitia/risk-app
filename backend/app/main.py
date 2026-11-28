@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.adapters.http.salud import router as router_salud
 from app.config import obtener_config
 
 logger = logging.getLogger(__name__)
@@ -65,8 +66,9 @@ def crear_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Los routers se montan aqui. En el esqueleto no hay ninguno todavia:
-    # el primer endpoint llega con su caso de uso y su prueba.
+    # Los routers se montan aqui. El registro esta disperso: cada router se anade
+    # en un solo lugar, y por eso se puede responder "que endpoints existen".
+    app.include_router(router_salud)
 
     return app
 
